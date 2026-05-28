@@ -6,10 +6,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.db.database import init_db
-from app.api.routes import health, videos, prompts
+from app.api.routes import health, videos, prompts, pipeline
 
 OUTPUTS_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "../../outputs/videos")
+)
+PIPELINE_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "../../outputs/pipeline")
 )
 STATIC_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "../../static")
@@ -19,6 +22,7 @@ STATIC_DIR = os.path.normpath(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
+    os.makedirs(PIPELINE_DIR, exist_ok=True)
     await init_db()
     yield
 
@@ -38,10 +42,15 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api")
 app.include_router(videos.router, prefix="/api")
 app.include_router(prompts.router, prefix="/api")
+app.include_router(pipeline.router, prefix="/api")
 
-# Sert les vidéos générées
+# Sert les vidéos Kling
 if os.path.isdir(OUTPUTS_DIR):
     app.mount("/videos", StaticFiles(directory=OUTPUTS_DIR), name="videos")
+
+# Sert les vidéos Pipeline B
+if os.path.isdir(PIPELINE_DIR):
+    app.mount("/pipeline", StaticFiles(directory=PIPELINE_DIR), name="pipeline")
 
 # Sert le frontend React en production
 if os.path.isdir(STATIC_DIR):

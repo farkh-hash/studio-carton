@@ -42,8 +42,8 @@ Sujet → Claude script → ElevenLabs voix → Whisper sous-titres → MoviePy 
 ### À configurer (Pipeline B)
 | Variable | Statut | Où obtenir |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | ❌ Manquante | console.anthropic.com → API Keys |
-| `ELEVENLABS_API_KEY` | ❌ Manquante | elevenlabs.io → Settings → API Keys |
+| `ANTHROPIC_API_KEY` | ✅ Configurée | console.anthropic.com → API Keys |
+| `ELEVENLABS_API_KEY` | ✅ Configurée | elevenlabs.io → Settings → API Keys |
 
 ### Clés Kling AI
 | Variable | Statut |

@@ -24,9 +24,26 @@ CREATE TABLE IF NOT EXISTS videos (
 """
 
 
+CREATE_PIPELINE_TABLE = """
+CREATE TABLE IF NOT EXISTS pipeline_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    topic TEXT NOT NULL,
+    style TEXT DEFAULT 'viral',
+    duration INTEGER DEFAULT 60,
+    status TEXT DEFAULT 'pending',
+    script TEXT,
+    video_url TEXT,
+    error_msg TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
+
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(CREATE_VIDEOS_TABLE)
+        await db.execute(CREATE_PIPELINE_TABLE)
         await db.commit()
 
 
