@@ -9,13 +9,13 @@ from app.db.database import init_db
 from app.api.routes import health, videos, prompts, pipeline
 
 OUTPUTS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "../../outputs/videos")
+    os.path.join(os.path.dirname(__file__), "../outputs/videos")
 )
 PIPELINE_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "../../outputs/pipeline")
+    os.path.join(os.path.dirname(__file__), "../outputs/pipeline")
 )
 STATIC_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "../../static")
+    os.path.join(os.path.dirname(__file__), "../static")
 )
 
 

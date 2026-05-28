@@ -11,7 +11,7 @@ _DB_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "../../data/studio_carton.db")
 )
 _OUTPUTS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "../../../outputs/videos")
+    os.path.join(os.path.dirname(__file__), "../../outputs/videos")
 )
 
 
