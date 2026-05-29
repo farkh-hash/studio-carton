@@ -19,6 +19,8 @@ export default function App() {
   const [jobs, setJobs] = useState([]);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [pipelineTopic, setPipelineTopic] = useState("");
+  const [pipelineScript, setPipelineScript] = useState("");
+  const [pipelineFormat, setPipelineFormat] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -48,8 +50,10 @@ export default function App() {
     setUser(null);
   };
 
-  const handleTopicSelect = (topic) => {
+  const handleTopicSelect = (topic, script = "", format = "") => {
     setPipelineTopic(topic);
+    setPipelineScript(script);
+    setPipelineFormat(format);
     setTab("pipeline");
   };
 
@@ -105,7 +109,9 @@ export default function App() {
             <PipelineForm
               onJobCreated={(job) => setJobs((prev) => [job, ...prev])}
               initialTopic={pipelineTopic}
-              onTopicUsed={() => setPipelineTopic("")}
+              initialScript={pipelineScript}
+              initialFormat={pipelineFormat}
+              onTopicUsed={() => { setPipelineTopic(""); setPipelineScript(""); setPipelineFormat(""); }}
               userEmail={user.email}
               isPro={user.is_pro}
               credits={user.credits}

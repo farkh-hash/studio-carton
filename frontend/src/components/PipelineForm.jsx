@@ -18,7 +18,7 @@ const HOOKS = [
   { value: "contre_intuitif", label: "🔄 Contre-intuitif" },
 ];
 
-export default function PipelineForm({ onJobCreated, initialTopic = "", onTopicUsed, userEmail, isPro, credits, onUpgrade, onCreditsUpdate }) {
+export default function PipelineForm({ onJobCreated, initialTopic = "", initialScript = "", initialFormat = "", onTopicUsed, userEmail, isPro, credits, onUpgrade, onCreditsUpdate }) {
   const [topic, setTopic] = useState("");
   const [style, setStyle] = useState("viral");
   const [hookType, setHookType] = useState("auto");
@@ -27,10 +27,18 @@ export default function PipelineForm({ onJobCreated, initialTopic = "", onTopicU
   const [previewLoading, setPreviewLoading] = useState(false);
   const [error, setError] = useState("");
   const [script, setScript] = useState("");
-  const [step, setStep] = useState("form"); // "form" | "preview"
+  const [step, setStep] = useState("form");
 
   useEffect(() => {
-    if (initialTopic) { setTopic(initialTopic); onTopicUsed?.(); }
+    if (initialTopic) {
+      setTopic(initialTopic);
+      if (initialScript) { setScript(initialScript); setStep("preview"); }
+      if (initialFormat) {
+        const map = { "30s": 30, "60s": 60, "90s": 90, "2min": 120, "3min": 180 };
+        setDuration(map[initialFormat] || 60);
+      }
+      onTopicUsed?.();
+    }
   }, [initialTopic]);
 
   const handlePreview = async (e) => {
