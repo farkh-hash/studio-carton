@@ -1,6 +1,5 @@
 import os
 import tempfile
-import subprocess
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import (
@@ -15,8 +14,13 @@ FPS = 30
 BG_COLOR = (15, 15, 25)
 
 CHARACTER_COLORS = {
-    "ALEX": (96, 165, 250),
-    "SARAH": (244, 114, 182),
+    "ALEX": (96, 165, 250),    # bleu
+    "SARAH": (244, 114, 182),  # rose
+}
+
+CHARACTER_POSITIONS = {
+    "ALEX": "left",
+    "SARAH": "right",
 }
 
 
@@ -31,86 +35,44 @@ def _load_font(size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default()
 
 
-def _process_character_clip(input_path: str, output_path: str, duration: float) -> bool:
-    """Crop et resize un clip en portrait 9:16 avec ffmpeg."""
-    cmd = [
-        "ffmpeg", "-y", "-i", input_path,
-        "-t", str(duration + 0.5),
-        "-vf", f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT}",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "28",
-        "-an", output_path
-    ]
-    result = subprocess.run(cmd, capture_output=True, timeout=60)
-    return result.returncode == 0 and os.path.exists(output_path)
-
-
 def _make_fallback_bg(duration: float) -> ImageClip:
     img = Image.new("RGB", (WIDTH, HEIGHT), BG_COLOR)
     draw = ImageDraw.Draw(img)
     for y in range(HEIGHT):
-        r = int(BG_COLOR[0] + (40 - BG_COLOR[0]) * y / HEIGHT)
-        g = int(BG_COLOR[1] + (15 - BG_COLOR[1]) * y / HEIGHT)
-        b = int(BG_COLOR[2] + (50 - BG_COLOR[2]) * y / HEIGHT)
+        ratio = y / HEIGHT
+        r = int(BG_COLOR[0] + (40 - BG_COLOR[0]) * ratio)
+        g = int(BG_COLOR[1] + (15 - BG_COLOR[1]) * ratio)
+        b = int(BG_COLOR[2] + (50 - BG_COLOR[2]) * ratio)
         draw.line([(0, y), (WIDTH, y)], fill=(r, g, b))
     return ImageClip(np.array(img), duration=duration)
 
 
-def _make_character_bg(clip_path: str, duration: float) -> VideoFileClip | None:
-    """Charge et boucle un clip de personnage."""
-    try:
-        tmp_proc = clip_path.replace(".mp4", "_proc.mp4")
-        if _process_character_clip(clip_path, tmp_proc, duration):
-            c = VideoFileClip(tmp_proc, audio=False)
-            # Boucler si nécessaire
-            if c.duration < duration:
-                loops = int(duration / c.duration) + 1
-                clips = [c] * loops
-                c = concatenate_videoclips(clips).subclip(0, duration)
-            else:
-                c = c.subclip(0, duration)
-            return c
-    except Exception as e:
-        print(f"[SCENARIO] Clip erreur: {e}")
-    return None
-
-
-def _make_name_badge(character: str) -> np.ndarray:
-    """Crée un badge avec le nom du personnage."""
-    img = Image.new("RGBA", (WIDTH, 120), (0, 0, 0, 0))
+def _make_dialogue_frame(character: str, line: str, emotion: str) -> np.ndarray:
+    """Crée une frame avec le personnage identifié et sa réplique."""
+    img = Image.new("RGBA", (WIDTH, 420), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    font = _load_font(52)
+
     color = CHARACTER_COLORS.get(character, (255, 255, 255))
+    font_name = _load_font(44)
+    font_line = _load_font(70)
 
-    # Fond du badge
-    draw.rounded_rectangle([40, 10, 500, 105], radius=20, fill=(0, 0, 0, 200))
+    # Fond du bloc dialogue
+    draw.rounded_rectangle([30, 10, WIDTH - 30, 410], radius=24, fill=(0, 0, 0, 210))
 
-    # Point coloré + nom
-    draw.ellipse([60, 40, 95, 75], fill=(*color, 255))
-    draw.text((110, 35), character, font=font, fill=(255, 255, 255, 255))
+    # Barre colorée latérale
+    draw.rounded_rectangle([30, 10, 44, 410], radius=12, fill=(*color, 255))
 
-    return np.array(img)
+    # Nom du personnage
+    name_text = f"  {character}  •  {emotion}" if emotion else f"  {character}"
+    draw.text((60, 22), name_text, font=font_name, fill=(*color, 255))
 
-
-def _make_dialogue_overlay(character: str, line: str) -> np.ndarray:
-    """Crée le texte de la réplique en bas de l'écran."""
-    img = Image.new("RGBA", (WIDTH, 350), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    font_line = _load_font(64)
-    color = CHARACTER_COLORS.get(character, (255, 255, 255))
-
-    # Fond semi-transparent
-    draw.rounded_rectangle([20, 10, WIDTH - 20, 340], radius=20, fill=(0, 0, 0, 210))
-
-    # Ligne colorée du personnage (barre verticale)
-    draw.rectangle([40, 10, 48, 105], fill=(*color, 255))
-
-    # Texte avec word wrap
+    # Réplique avec word wrap
     words = line.split()
     lines_out, line_buf = [], []
     for word in words:
         test = " ".join(line_buf + [word])
         bbox = draw.textbbox((0, 0), test, font=font_line)
-        if bbox[2] > WIDTH - 80:
+        if bbox[2] > WIDTH - 100:
             lines_out.append(" ".join(line_buf))
             line_buf = [word]
         else:
@@ -118,18 +80,19 @@ def _make_dialogue_overlay(character: str, line: str) -> np.ndarray:
     if line_buf:
         lines_out.append(" ".join(line_buf))
 
-    total_h = len(lines_out) * (64 + 8)
-    y = (330 - total_h) // 2 + 10
+    total_h = len(lines_out) * (70 + 8)
+    y = 75 + max(0, (310 - total_h) // 2)
 
     for lt in lines_out:
         bbox = draw.textbbox((0, 0), lt, font=font_line)
         x = (WIDTH - (bbox[2] - bbox[0])) // 2
+        # Contour
         for dx in [-2, 0, 2]:
             for dy in [-2, 0, 2]:
                 if dx != 0 or dy != 0:
                     draw.text((x + dx, y + dy), lt, font=font_line, fill=(0, 0, 0, 255))
         draw.text((x, y), lt, font=font_line, fill=(255, 255, 255, 255))
-        y += 64 + 8
+        y += 70 + 8
 
     return np.array(img)
 
@@ -142,15 +105,15 @@ def assemble_scenario(
     character_clips: dict = None,
 ) -> str:
     """
-    Assemble le scénario :
-    - Chaque personnage a son propre clip vidéo qui s'affiche quand il parle
-    - Le dialogue apparaît en bas de l'écran
-    - Le badge du personnage apparaît en haut
+    Assemble le scénario de façon simple et fiable :
+    - Un fond global (Pexels ou dégradé)
+    - Overlay dialogue par réplique avec nom du personnage et couleur
+    - Audio séquentiel de chaque réplique
     """
     if not segments:
         raise ValueError("Aucun segment audio")
 
-    # Sauvegarder les segments audio
+    # Sauvegarder les segments audio et mesurer les durées
     segment_files = []
     for i, seg in enumerate(segments):
         tmp = tempfile.NamedTemporaryFile(suffix=f"_seg_{i}.mp3", delete=False)
@@ -158,116 +121,85 @@ def assemble_scenario(
         tmp.close()
         segment_files.append(tmp.name)
 
-    # Charger les clips audio et mesurer les durées réelles
     audio_clips = []
     durations = []
     for f in segment_files:
         try:
             ac = AudioFileClip(f)
             audio_clips.append(ac)
-            durations.append(ac.duration + 0.3)  # pause entre répliques
-        except Exception:
-            durations.append(seg.get("duration_estimate", 3.0))
+            durations.append(ac.duration + 0.25)
+        except Exception as e:
+            print(f"[SCENARIO] Audio error: {e}")
+            durations.append(3.0)
             audio_clips.append(None)
 
     total_duration = sum(durations)
 
-    # Préparer les clips de personnages (si disponibles)
-    char_clips_processed = {}
-    if character_clips:
-        for char, clip_path in character_clips.items():
-            if clip_path and os.path.exists(clip_path):
-                processed_path = clip_path.replace(".mp4", f"_{char}_proc.mp4")
-                if _process_character_clip(clip_path, processed_path, total_duration):
-                    char_clips_processed[char] = processed_path
+    # Fond global
+    if bg_video_path and os.path.exists(bg_video_path):
+        try:
+            c = VideoFileClip(bg_video_path, audio=False)
+            if c.duration < total_duration:
+                loops = int(total_duration / c.duration) + 1
+                bg = concatenate_videoclips([c] * loops).subclip(0, total_duration)
+            else:
+                bg = c.subclip(0, total_duration)
+        except Exception:
+            bg = _make_fallback_bg(total_duration)
+    else:
+        bg = _make_fallback_bg(total_duration)
 
-    # Construire la timeline segment par segment
-    video_clips_sequence = []
+    # Overlay sombre
+    overlay = ColorClip(size=(WIDTH, HEIGHT), color=(0, 0, 0), duration=total_duration).set_opacity(0.35)
+
+    # Clips de dialogue (simple, un par réplique)
     dialogue_clips = []
-    badge_clips = []
-
     t = 0.0
-    for i, (seg, dur) in enumerate(zip(segments, durations)):
+    for seg, dur in zip(segments, durations):
         character = seg.get("character", "ALEX")
+        line = seg.get("line", "")
+        emotion = seg.get("emotion", "")
 
-        # Background pour ce segment : clip du personnage ou fallback
-        if character in char_clips_processed:
-            try:
-                char_clip_path = char_clips_processed[character]
-                c = VideoFileClip(char_clip_path, audio=False)
-                if c.duration < dur:
-                    loops = int(dur / c.duration) + 1
-                    c = concatenate_videoclips([c] * loops).subclip(0, dur)
-                else:
-                    c = c.subclip(0, dur)
-                bg_seg = c.set_start(t)
-            except Exception:
-                bg_seg = _make_fallback_bg(dur).set_start(t)
-        elif bg_video_path and os.path.exists(bg_video_path):
-            try:
-                c = VideoFileClip(bg_video_path, audio=False)
-                offset = (t % c.duration)
-                if offset + dur > c.duration:
-                    bg_seg = c.subclip(0, dur).set_start(t)
-                else:
-                    bg_seg = c.subclip(offset, offset + dur).set_start(t)
-            except Exception:
-                bg_seg = _make_fallback_bg(dur).set_start(t)
-        else:
-            bg_seg = _make_fallback_bg(dur).set_start(t)
+        if not line:
+            t += dur
+            continue
 
-        video_clips_sequence.append(bg_seg)
-
-        # Overlay texte du dialogue
-        dialogue_frame = _make_dialogue_overlay(character, seg.get("line", ""))
-        dialogue_clip = (
-            ImageClip(dialogue_frame, ismask=False)
+        frame = _make_dialogue_frame(character, line, emotion)
+        clip = (
+            ImageClip(frame, ismask=False)
             .set_start(t)
-            .set_duration(dur - 0.1)
-            .set_position(("center", HEIGHT - 360))
+            .set_duration(max(0.1, dur - 0.1))
+            .set_position(("center", HEIGHT - 440))
             .fadein(0.1)
             .fadeout(0.1)
         )
-        dialogue_clips.append(dialogue_clip)
-
-        # Badge nom du personnage
-        badge_frame = _make_name_badge(character)
-        badge_clip = (
-            ImageClip(badge_frame, ismask=False)
-            .set_start(t)
-            .set_duration(dur - 0.1)
-            .set_position((0, 60))
-            .fadein(0.1)
-            .fadeout(0.1)
-        )
-        badge_clips.append(badge_clip)
-
+        dialogue_clips.append(clip)
         t += dur
 
-    # Overlay sombre léger
-    overlay = ColorClip(size=(WIDTH, HEIGHT), color=(0, 0, 0), duration=total_duration).set_opacity(0.25)
+    # Composition finale
+    video = CompositeVideoClip(
+        [bg, overlay] + dialogue_clips,
+        size=(WIDTH, HEIGHT),
+    )
 
-    # Composer la vidéo finale
-    all_clips = video_clips_sequence + [overlay] + badge_clips + dialogue_clips
-    video = CompositeVideoClip(all_clips, size=(WIDTH, HEIGHT))
-
-    # Audio : enchaînement des répliques
+    # Audio séquentiel
     audio_parts = []
     t = 0.0
     for ac, dur in zip(audio_clips, durations):
-        if ac:
+        if ac is not None:
             audio_parts.append(ac.set_start(t))
         t += dur
 
     if audio_parts:
-        from moviepy.editor import CompositeAudioClip as CAC
-        final_audio = CAC(audio_parts)
+        final_audio = CompositeAudioClip(audio_parts)
 
-        # Musique de fond optionnelle
         if music_path and os.path.exists(music_path):
             try:
-                music = audio_loop(AudioFileClip(music_path).volumex(0.08), duration=total_duration)
-                final_audio = CAC([final_audio, music])
+                music = audio_loop(
+                    AudioFileClip(music_path).volumex(0.08),
+                    duration=total_duration
+                )
+                final_audio = CompositeAudioClip([final_audio, music])
             except Exception:
                 pass
 
@@ -296,12 +228,5 @@ def assemble_scenario(
             except Exception:
                 pass
     video.close()
-
-    # Supprimer les clips traités
-    for p in char_clips_processed.values():
-        try:
-            os.remove(p)
-        except Exception:
-            pass
 
     return output_path
