@@ -1,15 +1,21 @@
-import io
 import asyncio
-from gtts import gTTS
+import tempfile
+import os
+import edge_tts
 
-
-def _generate_sync(text: str) -> bytes:
-    tts = gTTS(text=text, lang="fr", slow=False)
-    buf = io.BytesIO()
-    tts.write_to_fp(buf)
-    return buf.getvalue()
+VOICE = "fr-FR-DeniseNeural"
 
 
 async def generate_audio(text: str) -> bytes:
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _generate_sync, text)
+    tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+    tmp.close()
+    try:
+        communicate = edge_tts.Communicate(text, VOICE, rate="+10%")
+        await communicate.save(tmp.name)
+        with open(tmp.name, "rb") as f:
+            return f.read()
+    finally:
+        try:
+            os.remove(tmp.name)
+        except Exception:
+            pass

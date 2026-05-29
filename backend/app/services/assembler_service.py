@@ -13,9 +13,9 @@ from typing import List
 
 WIDTH, HEIGHT = 1080, 1920
 FPS = 30
-FONT_SIZE = 72
-FONT_COLOR = (255, 255, 255)
-SHADOW_COLOR = (0, 0, 0)
+FONT_SIZE = 88
+FONT_COLOR = (255, 230, 0)      # jaune vif
+OUTLINE_COLOR = (0, 0, 0)       # contour noir
 BG_COLOR = (10, 10, 20)
 
 
@@ -67,9 +67,14 @@ def _make_subtitle_frame(text: str) -> np.ndarray:
     for line_text in lines:
         bbox = draw.textbbox((0, 0), line_text, font=font)
         x = (WIDTH - (bbox[2] - bbox[0])) // 2
-        draw.text((x + 3, y + 3), line_text, font=font, fill=(*SHADOW_COLOR, 200))
+        # Contour noir épais (8 directions)
+        for dx in [-3, -2, 0, 2, 3]:
+            for dy in [-3, -2, 0, 2, 3]:
+                if dx != 0 or dy != 0:
+                    draw.text((x + dx, y + dy), line_text, font=font, fill=(*OUTLINE_COLOR, 255))
+        # Texte jaune
         draw.text((x, y), line_text, font=font, fill=(*FONT_COLOR, 255))
-        y += FONT_SIZE + 10
+        y += FONT_SIZE + 14
 
     return np.array(img)
 
@@ -92,8 +97,8 @@ def assemble_video(
     else:
         bg = _make_fallback_bg(duration)
 
-    # Overlay sombre pour lisibilité des sous-titres
-    overlay = ColorClip(size=(WIDTH, HEIGHT), color=(0, 0, 0), duration=duration).set_opacity(0.45)
+    # Overlay sombre léger pour garder les couleurs du fond
+    overlay = ColorClip(size=(WIDTH, HEIGHT), color=(0, 0, 0), duration=duration).set_opacity(0.30)
 
     # Sous-titres
     subtitle_clips = []

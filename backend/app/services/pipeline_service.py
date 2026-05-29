@@ -25,6 +25,26 @@ async def _update_job(job_id: int, **kwargs):
         await db.commit()
 
 
+async def _build_background(job_id: int, topic: str, duration: int) -> str | None:
+    if not settings.PEXELS_API_KEY:
+        return None
+    try:
+        clip_paths = await background_service.fetch_background_clips(topic, duration)
+        if not clip_paths:
+            return None
+        bg_path = os.path.join(_OUTPUTS_DIR, f"bg_{job_id}.mp4")
+        ok = background_service.build_background_video(clip_paths, duration + 5, bg_path)
+        for p in clip_paths:
+            try:
+                os.remove(p)
+            except Exception:
+                pass
+        return bg_path if ok else None
+    except Exception as e:
+        print(f"[PIPELINE] Background error: {e}")
+        return None
+
+
 async def run_pipeline(job_id: int, topic: str, style: str, duration: int):
     os.makedirs(_OUTPUTS_DIR, exist_ok=True)
 
@@ -34,30 +54,17 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int):
         script = await script_service.generate_script(topic, duration, style)
         await _update_job(job_id, status="generating_audio", script=script)
 
-        # Étape 2 — Audio TTS
-        audio_bytes = await tts_service.generate_audio(script)
+        # Étapes 2+3 — Audio TTS + Background Pexels en parallèle
+        audio_bytes, bg_video_path = await asyncio.gather(
+            tts_service.generate_audio(script),
+            _build_background(job_id, topic, duration),
+        )
+
         audio_path = os.path.join(_OUTPUTS_DIR, f"audio_{job_id}.mp3")
         async with aiofiles.open(audio_path, "wb") as f:
             await f.write(audio_bytes)
-        await _update_job(job_id, status="assembling_video")
 
-        # Étape 3 — Vidéo de fond Pexels via ffmpeg
-        bg_video_path = None
-        if settings.PEXELS_API_KEY:
-            try:
-                clip_paths = await background_service.fetch_background_clips(topic, duration)
-                if clip_paths:
-                    bg_path = os.path.join(_OUTPUTS_DIR, f"bg_{job_id}.mp4")
-                    ok = background_service.build_background_video(clip_paths, duration + 5, bg_path)
-                    if ok:
-                        bg_video_path = bg_path
-                    for p in clip_paths:
-                        try:
-                            os.remove(p)
-                        except Exception:
-                            pass
-            except Exception as e:
-                print(f"[PIPELINE] Background error: {e}")
+        await _update_job(job_id, status="assembling_video")
 
         # Étape 4 — Sous-titres
         from moviepy.editor import AudioFileClip
