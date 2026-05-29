@@ -68,7 +68,7 @@ def build_background_video(clip_paths: list[str], duration: float, output_path: 
         "-f", "concat", "-safe", "0", "-i", concat_file.name,
         "-t", str(duration),
         "-c:v", "libx264", "-preset", "fast", "-crf", "26",
-        "-vf", "scale=1080:1920",
+        "-vf", f"scale=1080:1920,fade=t=in:st=0:d=0.8,fade=t=out:st={max(0, duration-1.2)}:d=0.8",
         "-an", output_path
     ]
     result = subprocess.run(cmd, capture_output=True, timeout=120)
