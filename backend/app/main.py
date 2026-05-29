@@ -19,10 +19,12 @@ STATIC_DIR = os.path.normpath(
 )
 
 
+os.makedirs(OUTPUTS_DIR, exist_ok=True)
+os.makedirs(PIPELINE_DIR, exist_ok=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    os.makedirs(OUTPUTS_DIR, exist_ok=True)
-    os.makedirs(PIPELINE_DIR, exist_ok=True)
     await init_db()
     yield
 
@@ -44,13 +46,8 @@ app.include_router(videos.router, prefix="/api")
 app.include_router(prompts.router, prefix="/api")
 app.include_router(pipeline.router, prefix="/api")
 
-# Sert les vidéos Kling
-if os.path.isdir(OUTPUTS_DIR):
-    app.mount("/videos", StaticFiles(directory=OUTPUTS_DIR), name="videos")
-
-# Sert les vidéos Pipeline B
-if os.path.isdir(PIPELINE_DIR):
-    app.mount("/pipeline", StaticFiles(directory=PIPELINE_DIR), name="pipeline")
+app.mount("/videos", StaticFiles(directory=OUTPUTS_DIR), name="videos")
+app.mount("/pipeline", StaticFiles(directory=PIPELINE_DIR), name="pipeline")
 
 # Sert le frontend React en production
 if os.path.isdir(STATIC_DIR):
