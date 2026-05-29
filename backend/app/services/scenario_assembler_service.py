@@ -113,6 +113,9 @@ def _build_drawtext_filters(segments: list[dict], durations: list[float]) -> str
             t += dur + PAUSE
             continue
 
+        # Utiliser gte*lte au lieu de between() pour eviter les virgules
+        enable = f"'gte(t\\,{t:.3f})*lte(t\\,{t_end:.3f})'"
+
         # Badge nom du personnage
         name_text = _escape_text(f"{char}" + (f"  |  {emotion}" if emotion else ""))
         badge_y = HEIGHT - 440
@@ -120,7 +123,7 @@ def _build_drawtext_filters(segments: list[dict], durations: list[float]) -> str
             f"drawtext=fontfile='{font}':text='{name_text}':fontsize=38:"
             f"fontcolor={color}:x=60:y={badge_y}:"
             f"box=1:boxcolor=black@0.8:boxborderw=12:"
-            f"enable='between(t,{t:.3f},{t_end:.3f})'"
+            f"enable={enable}"
         )
 
         # Lignes de dialogue
@@ -134,13 +137,13 @@ def _build_drawtext_filters(segments: list[dict], durations: list[float]) -> str
                 filters.append(
                     f"drawtext=fontfile='{font}':text='{escaped}':fontsize=68:"
                     f"fontcolor=black:x=(w-tw)/2+{dx}:y={y+dy}:"
-                    f"enable='between(t,{t:.3f},{t_end:.3f})'"
+                    f"enable={enable}"
                 )
             # Texte blanc
             filters.append(
                 f"drawtext=fontfile='{font}':text='{escaped}':fontsize=68:"
                 f"fontcolor=white:x=(w-tw)/2:y={y}:"
-                f"enable='between(t,{t:.3f},{t_end:.3f})'"
+                f"enable={enable}"
             )
 
         t += dur + PAUSE
