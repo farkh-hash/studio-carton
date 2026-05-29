@@ -32,12 +32,15 @@ async def fetch_background_clips(topic: str, duration: int) -> list[str]:
     headers = {"Authorization": settings.PEXELS_API_KEY}
     params = {"query": keywords, "per_page": 8, "size": "small"}
 
+    print(f"[PEXELS] Searching: '{keywords}' | key={settings.PEXELS_API_KEY[:8]}...")
     async with httpx.AsyncClient(timeout=20) as client:
         resp = await client.get(PEXELS_VIDEO_API, headers=headers, params=params)
+        print(f"[PEXELS] API status: {resp.status_code}")
         resp.raise_for_status()
         data = resp.json()
 
     videos = data.get("videos", [])
+    print(f"[PEXELS] Videos found: {len(videos)}")
     if not videos:
         return []
 
@@ -64,12 +67,15 @@ async def fetch_background_clips(topic: str, duration: int) -> list[str]:
             try:
                 tmp = tempfile.NamedTemporaryFile(suffix=f"_bg_{i}.mp4", delete=False)
                 tmp.close()
+                print(f"[PEXELS] Downloading clip {i}: {url[:60]}...")
                 r = await client.get(url)
                 r.raise_for_status()
                 with open(tmp.name, "wb") as f:
                     f.write(r.content)
+                print(f"[PEXELS] Clip {i} downloaded: {len(r.content)} bytes")
                 paths.append(tmp.name)
-            except Exception:
+            except Exception as e:
+                print(f"[PEXELS] Clip {i} download failed: {e}")
                 continue
 
     return paths

@@ -46,8 +46,9 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int):
         if settings.PEXELS_API_KEY:
             try:
                 clip_paths = await background_service.fetch_background_clips(topic, duration)
-            except Exception:
-                pass
+                print(f"[PIPELINE] Pexels clips: {len(clip_paths)}")
+            except Exception as e:
+                print(f"[PIPELINE] Pexels error: {e}")
 
         # Étape 4 — Sous-titres
         from moviepy.editor import AudioFileClip
