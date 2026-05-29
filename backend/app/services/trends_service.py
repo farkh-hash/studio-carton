@@ -6,241 +6,267 @@ from datetime import date
 from groq import Groq
 from app.core.config import settings
 
+YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
 
-async def _youtube_trending_fr(max_results: int = 20) -> list[dict]:
-    """Récupère les vraies vidéos trending sur YouTube France via l'API officielle."""
+# Pays francophones pour élargir l'analyse
+FRANCOPHONE_REGIONS = ["FR", "BE", "CA", "CH", "MA", "SN"]
+
+
+async def _youtube_trending(region: str = "FR", max_results: int = 10) -> list[dict]:
+    """YouTube trending pour une région."""
+    if not settings.YOUTUBE_API_KEY:
+        return []
     params = {
         "part": "snippet,statistics",
         "chart": "mostPopular",
-        "regionCode": "FR",
+        "regionCode": region,
         "maxResults": max_results,
         "key": settings.YOUTUBE_API_KEY,
     }
-    async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.get("https://www.googleapis.com/youtube/v3/videos", params=params)
-        resp.raise_for_status()
-        data = resp.json()
-
-    videos = []
-    for item in data.get("items", []):
-        snippet = item.get("snippet", {})
-        stats = item.get("statistics", {})
-        videos.append({
-            "title": snippet.get("title", ""),
-            "channel": snippet.get("channelTitle", ""),
-            "category": snippet.get("categoryId", ""),
-            "views": int(stats.get("viewCount", 0)),
-            "likes": int(stats.get("likeCount", 0)),
-            "tags": snippet.get("tags", [])[:5],
-        })
-    return videos
-
-
-async def _youtube_trending_shorts_fr() -> list[dict]:
-    """Cherche les YouTube Shorts trending en France."""
-    params = {
-        "part": "snippet,statistics",
-        "q": "#shorts viral france",
-        "type": "video",
-        "order": "viewCount",
-        "maxResults": 15,
-        "regionCode": "FR",
-        "relevanceLanguage": "fr",
-        "videoDuration": "short",
-        "key": settings.YOUTUBE_API_KEY,
-    }
-    async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.get("https://www.googleapis.com/youtube/v3/search", params=params)
-        resp.raise_for_status()
-        data = resp.json()
-
-    videos = []
-    for item in data.get("items", []):
-        snippet = item.get("snippet", {})
-        videos.append({
-            "title": snippet.get("title", ""),
-            "channel": snippet.get("channelTitle", ""),
-            "description": snippet.get("description", "")[:200],
-        })
-    return videos
-
-
-async def _google_trends_fr() -> list[str]:
-    """Récupère les tendances Google en France via l'API publique."""
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept-Language": "fr-FR,fr;q=0.9",
-        }
-        # Google Trends RSS feed France - pas besoin de pytrends
-        url = "https://trends.google.fr/trending/rss?geo=FR"
-        async with httpx.AsyncClient(timeout=10, headers=headers) as client:
-            resp = await client.get(url)
-            text = resp.text
-
-        # Extraire les titres du RSS
-        titles = re.findall(r'<title><!\[CDATA\[(.*?)\]\]></title>', text)
-        if not titles:
-            titles = re.findall(r'<title>(.*?)</title>', text)
-        # Exclure le premier titre (nom du feed)
-        return [t for t in titles[1:21] if t and len(t) > 2]
+        async with httpx.AsyncClient(timeout=12) as client:
+            resp = await client.get(f"{YOUTUBE_API}/videos", params=params)
+            resp.raise_for_status()
+            data = resp.json()
+        return [
+            {
+                "title": item["snippet"]["title"],
+                "channel": item["snippet"]["channelTitle"],
+                "views": int(item["statistics"].get("viewCount", 0)),
+                "region": region,
+            }
+            for item in data.get("items", [])
+        ]
     except Exception as e:
-        print(f"[TRENDS] Google Trends erreur: {e}")
+        print(f"[TRENDS] YouTube {region}: {e}")
         return []
 
 
-async def _reddit_trending_fr() -> list[dict]:
-    """Récupère les posts viraux via les flux RSS publics francophones."""
-    sources = [
-        ("https://www.reddit.com/r/france/hot.json?limit=5&raw_json=1", "france"),
-        ("https://news.ycombinator.com/rss", "hackernews"),
-    ]
-    headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; StudioCarton/1.0)",
-        "Accept": "application/json, text/xml, */*",
+async def _youtube_search_viral(query: str, max_results: int = 8) -> list[dict]:
+    """Cherche les vidéos virales sur un sujet via YouTube."""
+    if not settings.YOUTUBE_API_KEY:
+        return []
+    params = {
+        "part": "snippet",
+        "q": query,
+        "type": "video",
+        "order": "viewCount",
+        "maxResults": max_results,
+        "relevanceLanguage": "fr",
+        "key": settings.YOUTUBE_API_KEY,
     }
-    posts = []
+    try:
+        async with httpx.AsyncClient(timeout=12) as client:
+            resp = await client.get(f"{YOUTUBE_API}/search", params=params)
+            resp.raise_for_status()
+            data = resp.json()
+        return [
+            {"title": item["snippet"]["title"], "channel": item["snippet"]["channelTitle"]}
+            for item in data.get("items", [])
+        ]
+    except Exception as e:
+        print(f"[TRENDS] YouTube search: {e}")
+        return []
 
-    async with httpx.AsyncClient(timeout=10, headers=headers, follow_redirects=True) as client:
-        for url, source in sources:
+
+async def _google_trends_multi() -> list[str]:
+    """Google Trends RSS pour plusieurs pays francophones."""
+    regions = {
+        "FR": "https://trends.google.fr/trending/rss?geo=FR",
+        "CA": "https://trends.google.ca/trending/rss?geo=CA",
+        "BE": "https://trends.google.be/trending/rss?geo=BE",
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept-Language": "fr-FR,fr;q=0.9",
+    }
+    all_trends = []
+    async with httpx.AsyncClient(timeout=10, headers=headers) as client:
+        for country, url in regions.items():
             try:
                 resp = await client.get(url)
-                if "json" in url and resp.status_code == 200:
-                    data = resp.json()
-                    for post in data.get("data", {}).get("children", [])[:5]:
-                        p = post.get("data", {})
-                        title = p.get("title", "")
-                        if title:
-                            posts.append({"title": title, "upvotes": p.get("score", 0), "subreddit": source})
-                elif resp.status_code == 200:
-                    # Parse RSS
-                    import re
-                    titles = re.findall(r'<title><!\[CDATA\[(.*?)\]\]></title>', resp.text)
-                    if not titles:
-                        titles = re.findall(r'<title>(.*?)</title>', resp.text)[1:6]
-                    for t in titles[:5]:
-                        posts.append({"title": t, "upvotes": 100, "subreddit": source})
+                titles = re.findall(r'<title><!\[CDATA\[(.*?)\]\]></title>', resp.text)
+                if not titles:
+                    titles = re.findall(r'<title>(.*?)</title>', resp.text)[1:]
+                all_trends.extend([f"[{country}] {t}" for t in titles[:7]])
             except Exception:
                 continue
+    return all_trends[:20]
 
-    return posts[:10]
 
-
-async def _tiktok_trends_google() -> list[str]:
-    """Cherche les tendances virales France via DuckDuckGo (moins restrictif que Google)."""
+async def _tiktok_trends() -> list[str]:
+    """Tendances TikTok via DuckDuckGo (multi-plateforme)."""
     queries = [
-        f"tendances virales france {date.today().strftime('%B %Y')} tiktok reels",
-        "video virale france finance investissement 2025",
+        "tiktok viral france 2025 finance argent",
+        "trending tiktok francophone IA technologie",
+        "reels instagram viral france investissement",
+        "youtube shorts viral français 2025",
     ]
     headers = {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0",
         "Accept-Language": "fr-FR,fr;q=0.9",
-        "Accept": "text/html,application/xhtml+xml",
     }
-    titles = []
+    results = []
     async with httpx.AsyncClient(timeout=12, headers=headers, follow_redirects=True) as client:
-        for q in queries[:2]:
+        for q in queries[:3]:
             try:
                 resp = await client.get(
                     "https://html.duckduckgo.com/html/",
                     params={"q": q, "kl": "fr-fr"},
                 )
                 found = re.findall(r'class="result__a"[^>]*>(.*?)</a>', resp.text, re.DOTALL)
-                for t in found[:5]:
+                for t in found[:4]:
                     clean = re.sub(r'<[^>]+>', '', t).strip()
                     if clean and len(clean) > 10:
-                        titles.append(clean)
+                        results.append(clean)
             except Exception:
                 continue
-    return titles[:10]
+    return results[:12]
+
+
+async def _social_trending_scrape() -> list[str]:
+    """Scrape les tendances multi-réseaux via sources publiques."""
+    sources = [
+        # Hacker News (tech trends)
+        "https://news.ycombinator.com/rss",
+        # Reddit France
+        "https://www.reddit.com/r/france/hot.json?limit=5&raw_json=1",
+        # Reddit francophone finance
+        "https://www.reddit.com/r/financepersonnelle/hot.json?limit=5&raw_json=1",
+    ]
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; StudioCarton/1.0)",
+        "Accept": "application/json, text/xml, */*",
+    }
+    titles = []
+    async with httpx.AsyncClient(timeout=10, headers=headers, follow_redirects=True) as client:
+        for url in sources:
+            try:
+                resp = await client.get(url)
+                if resp.status_code != 200:
+                    continue
+                if "json" in url:
+                    data = resp.json()
+                    for post in data.get("data", {}).get("children", [])[:4]:
+                        t = post.get("data", {}).get("title", "")
+                        if t:
+                            titles.append(t)
+                else:
+                    found = re.findall(r'<title>(.*?)</title>', resp.text)[1:6]
+                    titles.extend(found)
+            except Exception:
+                continue
+    return titles[:15]
 
 
 async def analyze_trends() -> dict:
     """
-    Analyse complète des tendances du moment en France.
-    Sources : YouTube Trending FR, YouTube Shorts, Google Trends, Reddit FR, TikTok Google.
+    Analyse complète multi-plateformes et multi-pays francophones.
+    Sources : YouTube (FR/BE/CA/CH) + Google Trends multi-pays + TikTok + Instagram + Reddit
     """
     today = date.today().strftime("%d/%m/%Y")
-    print(f"[TRENDS] Analyse tendances France — {today}")
+    print(f"[TRENDS] Analyse multi-plateformes — {today}")
 
-    # Tout en parallèle
-    results = await asyncio.gather(
-        _youtube_trending_fr(20),
-        _youtube_trending_shorts_fr(),
-        _google_trends_fr(),
-        _reddit_trending_fr(),
-        _tiktok_trends_google(),
-        return_exceptions=True
-    )
+    # Lancer toutes les sources en parallèle
+    tasks = [
+        # YouTube trending sur plusieurs régions
+        _youtube_trending("FR", 10),
+        _youtube_trending("BE", 5),
+        _youtube_trending("CA", 5),
+        # YouTube search pour niches rentables en français
+        _youtube_search_viral("finance argent viral français", 6),
+        _youtube_search_viral("IA intelligence artificielle viral", 6),
+        # Google Trends multi-pays
+        _google_trends_multi(),
+        # TikTok + Instagram via DuckDuckGo
+        _tiktok_trends(),
+        # Reddit + Hacker News
+        _social_trending_scrape(),
+    ]
 
-    yt_trending = results[0] if not isinstance(results[0], Exception) else []
-    yt_shorts = results[1] if not isinstance(results[1], Exception) else []
-    google_trends = results[2] if not isinstance(results[2], Exception) else []
-    reddit_posts = results[3] if not isinstance(results[3], Exception) else []
-    tiktok_trends = results[4] if not isinstance(results[4], Exception) else []
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    print(f"[TRENDS] YT: {len(yt_trending)} | Shorts: {len(yt_shorts)} | Google: {len(google_trends)} | Reddit: {len(reddit_posts)} | TikTok: {len(tiktok_trends)}")
+    yt_fr = results[0] if not isinstance(results[0], Exception) else []
+    yt_be = results[1] if not isinstance(results[1], Exception) else []
+    yt_ca = results[2] if not isinstance(results[2], Exception) else []
+    yt_finance = results[3] if not isinstance(results[3], Exception) else []
+    yt_ia = results[4] if not isinstance(results[4], Exception) else []
+    google_trends = results[5] if not isinstance(results[5], Exception) else []
+    tiktok_ig = results[6] if not isinstance(results[6], Exception) else []
+    social = results[7] if not isinstance(results[7], Exception) else []
+
+    all_yt = yt_fr + yt_be + yt_ca
+
+    print(f"[TRENDS] YT FR:{len(yt_fr)} BE:{len(yt_be)} CA:{len(yt_ca)} | Finance:{len(yt_finance)} IA:{len(yt_ia)} | Google:{len(google_trends)} | TikTok/IG:{len(tiktok_ig)} | Social:{len(social)}")
 
     # Construire le contexte pour Groq
     context = f"DATE: {today}\n"
+    context += f"ANALYSE MULTI-PLATEFORMES (YouTube France/Belgique/Canada + Google Trends + TikTok + Instagram + Reddit)\n\n"
 
-    if yt_trending:
-        context += "\n=== YOUTUBE TRENDING FRANCE (vidéos les plus vues en ce moment) ===\n"
-        for v in yt_trending[:10]:
-            context += f"- {v['title']} ({v['views']:,} vues) | Chaîne: {v['channel']}\n"
+    if all_yt:
+        context += "=== YOUTUBE TRENDING (France, Belgique, Canada) ===\n"
+        for v in sorted(all_yt, key=lambda x: x.get("views", 0), reverse=True)[:12]:
+            context += f"- [{v['region']}] {v['title']} — {v.get('views', 0):,} vues\n"
 
-    if yt_shorts:
-        context += "\n=== YOUTUBE SHORTS VIRAUX FRANCE ===\n"
-        for v in yt_shorts[:8]:
-            context += f"- {v['title']} | {v['channel']}\n"
+    if yt_finance:
+        context += "\n=== YOUTUBE FINANCE/ARGENT VIRAL (francophone) ===\n"
+        for v in yt_finance[:6]:
+            context += f"- {v['title']}\n"
+
+    if yt_ia:
+        context += "\n=== YOUTUBE IA/TECH VIRAL (francophone) ===\n"
+        for v in yt_ia[:6]:
+            context += f"- {v['title']}\n"
 
     if google_trends:
-        context += "\n=== GOOGLE TRENDS FRANCE (recherches du moment) ===\n"
+        context += "\n=== GOOGLE TRENDS (France, Canada, Belgique) ===\n"
         for t in google_trends[:15]:
             context += f"- {t}\n"
 
-    if reddit_posts:
-        context += "\n=== REDDIT FRANCOPHONE (posts viraux) ===\n"
-        for p in reddit_posts[:8]:
-            context += f"- [{p['subreddit']}] {p['title']} ({p['upvotes']} upvotes)\n"
+    if tiktok_ig:
+        context += "\n=== TIKTOK & INSTAGRAM TENDANCES ===\n"
+        for t in tiktok_ig[:8]:
+            context += f"- {t}\n"
 
-    if tiktok_trends:
-        context += "\n=== TENDANCES TIKTOK FRANCE ===\n"
-        for t in tiktok_trends[:5]:
+    if social:
+        context += "\n=== REDDIT & RÉSEAUX SOCIAUX ===\n"
+        for t in social[:8]:
             context += f"- {t}\n"
 
     # Analyse Groq
     client = Groq(api_key=settings.GROQ_API_KEY)
 
-    prompt = f"""Analyse ces données réelles de tendances en France du {today} et identifie les meilleures opportunités de contenu viral.
+    prompt = f"""Analyse ces données réelles de tendances virales du {today} sur TOUS les réseaux sociaux francophones (YouTube, TikTok, Instagram, Reddit).
 
 {context}
 
-Génère une analyse stratégique et retourne un JSON :
+Identifie les meilleures opportunités de contenu viral monétisable en français.
+
+Retourne ce JSON :
 {{
   "top_niches": [
     {{
-      "niche": "Nom de la niche trending",
+      "niche": "Nom de la niche",
       "score": 9,
-      "proof": "Preuve chiffrée tirée des vraies données (ex: X millions de vues sur YT, tendance Google #1)",
-      "why_now": "Pourquoi cette niche explose MAINTENANT (événement, saison, tendance)",
-      "best_platform": "TikTok/YouTube/Instagram",
+      "proof": "Preuve chiffrée tirée des données réelles ci-dessus (titre vidéo + vues ou tendance)",
+      "why_now": "Pourquoi cette niche explose sur TOUS les réseaux maintenant",
+      "best_platform": "TikTok ou YouTube ou Instagram",
       "content_ideas": [
-        "Idée de vidéo virale 1 basée sur les tendances réelles",
+        "Idée vidéo virale 1 basée sur les vraies tendances",
         "Idée 2",
         "Idée 3"
       ],
-      "hook_inspiration": "Hook inspiré des vrais contenus trending trouvés",
-      "monetisation": "Comment monétiser cette niche"
+      "hook_inspiration": "Hook inspiré des vrais titres viraux trouvés",
+      "monetisation": "Comment monétiser (RPM, affiliation, brand deals)"
     }}
   ],
   "trending_keywords": ["mot-clé 1", "mot-clé 2", "mot-clé 3", "mot-clé 4", "mot-clé 5"],
-  "hot_formats": ["Format de contenu qui cartonne 1", "Format 2"],
-  "avoid_now": ["Sujet saturé/mort en ce moment 1", "Sujet 2"]
+  "hot_formats": ["Format qui cartonne 1 sur tous les réseaux", "Format 2"],
+  "avoid_now": ["Sujet saturé/mort 1", "Sujet 2"]
 }}
 
-Retourne exactement 5 niches. Base-toi UNIQUEMENT sur les données réelles fournies.
-JSON uniquement, sans texte autour."""
+5 niches maximum. Base-toi UNIQUEMENT sur les données ci-dessus.
+JSON uniquement."""
 
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
@@ -262,10 +288,11 @@ JSON uniquement, sans texte autour."""
 
     data["date"] = today
     data["sources"] = {
-        "youtube_trending": len(yt_trending),
-        "youtube_shorts": len(yt_shorts),
+        "youtube_fr": len(yt_fr),
+        "youtube_be_ca": len(yt_be) + len(yt_ca),
+        "youtube_niche_search": len(yt_finance) + len(yt_ia),
         "google_trends": len(google_trends),
-        "reddit": len(reddit_posts),
-        "tiktok": len(tiktok_trends),
+        "tiktok_instagram": len(tiktok_ig),
+        "social_reddit": len(social),
     }
     return data
