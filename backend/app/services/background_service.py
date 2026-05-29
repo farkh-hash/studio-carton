@@ -84,6 +84,59 @@ def build_background_video(clip_paths: list[str], duration: float, output_path: 
     return result.returncode == 0
 
 
+async def fetch_character_clips(character: str, topic_keywords: str) -> str | None:
+    """Télécharge un clip d'un personnage qui parle pour le scénario."""
+    if not settings.PEXELS_API_KEY:
+        return None
+
+    # Chercher des clips de personnes qui parlent selon le personnage
+    gender_query = "man talking camera" if character == "ALEX" else "woman talking camera"
+    queries = [
+        f"{gender_query} {topic_keywords}",
+        gender_query,
+        "person talking camera",
+    ]
+
+    headers = {"Authorization": settings.PEXELS_API_KEY}
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        for query in queries:
+            try:
+                params = {"query": query, "per_page": 5, "size": "small", "orientation": "portrait"}
+                resp = await client.get(PEXELS_VIDEO_API, headers=headers, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                videos = data.get("videos", [])
+                if not videos:
+                    continue
+
+                # Prendre la première vidéo disponible
+                video = videos[0]
+                files = video.get("video_files", [])
+                sd_files = [f for f in files if f.get("width", 9999) <= 1280]
+                if not sd_files:
+                    sd_files = files
+                if not sd_files:
+                    continue
+
+                chosen = min(sd_files, key=lambda f: f.get("width", 9999))
+                url = chosen.get("link", "")
+                if not url:
+                    continue
+
+                async with httpx.AsyncClient(timeout=60, follow_redirects=True) as dl:
+                    r = await dl.get(url)
+                    r.raise_for_status()
+                    import tempfile
+                    tmp = tempfile.NamedTemporaryFile(suffix=f"_{character}.mp4", delete=False)
+                    tmp.write(r.content)
+                    tmp.close()
+                    return tmp.name
+            except Exception:
+                continue
+    return None
+
+
 async def fetch_background_clips(topic: str, duration: int) -> list[str]:
     keywords = _get_english_keywords(topic)
     headers = {"Authorization": settings.PEXELS_API_KEY}
