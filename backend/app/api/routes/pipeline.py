@@ -79,6 +79,20 @@ async def get_status(job_id: int, db: aiosqlite.Connection = Depends(get_db)):
     return dict(row)
 
 
+@router.get("/{job_id}/captions")
+async def get_captions(job_id: int, db: aiosqlite.Connection = Depends(get_db)):
+    row = await (await db.execute("SELECT topic, script FROM pipeline_jobs WHERE id=?", (job_id,))).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Job not found")
+    from app.services import caption_service
+    import asyncio
+    loop = asyncio.get_event_loop()
+    captions = await loop.run_in_executor(
+        None, caption_service.generate_captions, row["topic"], row["script"] or "", ""
+    )
+    return captions
+
+
 @router.delete("/{job_id}")
 async def delete_job(job_id: int, db: aiosqlite.Connection = Depends(get_db)):
     await db.execute("DELETE FROM pipeline_jobs WHERE id=?", (job_id,))
