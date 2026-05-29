@@ -1,25 +1,8 @@
+import asyncio
 from groq import Groq
 from app.core.config import settings
 
-HOOK_TYPES = {
-    "auto": "Choisis le meilleur type de hook pour ce sujet.",
-    "curiosite": "Hook CURIOSITÉ : révèle quelque chose que personne ne sait. Court, mystérieux, crée un vide informationnel.",
-    "choc": "Hook CHOC : déclaration audacieuse qui contredit une croyance commune. Surprenant et contre-intuitif.",
-    "identification": "Hook IDENTIFICATION : parle directement à quelqu'un qui vit ce problème. Crée une reconnaissance immédiate.",
-    "resultat": "Hook RÉSULTAT : promet un bénéfice concret avec un chiffre précis. Ex: 'X€ en Y jours', 'X% de [résultat]'.",
-    "contre_intuitif": "Hook CONTRE-INTUITIF : contredit l'intuition commune. Ce que tout le monde fait est une erreur.",
-    "nombre": "Hook NOMBRE : utilise un chiffre précis dès le début. '3 choses que 97% ignorent', '73% des gens font cette erreur'.",
-    "urgence": "Hook URGENCE : crée un sentiment d'urgence ou de FOMO. 'Stop !', 'Avant qu'il soit trop tard', 'Si tu ne changes pas ça...'.",
-}
-
-# Nombre de mots cibles par durée (français parlé = ~130-140 mots/min)
-WORD_COUNTS = {
-    30: 65,
-    60: 130,
-    90: 195,
-    120: 260,
-    180: 390,
-}
+WORD_COUNTS = {30: 70, 60: 140, 90: 210, 120: 280, 180: 420}
 
 STYLE_INSTRUCTIONS = {
     "viral": "Rythme ultra rapide. Max 8 mots par phrase. Chaque phrase crée tension ou curiosité. Boucles ouvertes.",
@@ -29,88 +12,226 @@ STYLE_INSTRUCTIONS = {
 }
 
 SYSTEM_PROMPT = """Tu es un expert des contenus viraux TikTok, YouTube Shorts et Instagram Reels.
-Tu crées des scripts COMPLETS optimisés pour 70%+ de rétention.
+Tu crées des scripts COMPLETS, FLUIDES et PERCUTANTS — jamais des bullet points, toujours de la vraie parole naturelle.
 
 Règles absolues :
-- Hook = les 2 PREMIÈRES secondes décident si le spectateur reste ou part
-- Max 8-10 mots par phrase — jamais plus
-- Chaque phrase crée l'envie d'entendre la suivante (boucle ouverte)
-- Chiffres précis : "73%" pas "la plupart", "30 jours" pas "quelques semaines"
-- Zéro mot inutile, zéro remplissage
-- Français parlé naturel, pas académique
-- Le script DOIT avoir le nombre de mots demandé pour remplir la durée"""
+- PHRASES COMPLÈTES avec sujet + verbe + complément — jamais de fragments
+- Max 8-10 mots par phrase sauf le hook
+- Chaque phrase justifie la suivante (boucle ouverte)
+- Chiffres précis : "73%" pas "la plupart"
+- Zéro fausse promesse — fort mais honnête
+- Français parlé naturel, conversationnel"""
+
+
+async def _run_all_research(topic: str, style: str) -> dict:
+    """
+    Lance tous les agents de recherche en parallèle.
+    Agent 1: Analyse profonde des vrais scripts
+    Agent 2: 5 hooks testés et scorés
+    Agent 3: Persona/audience cible
+    Agent 5: Analyse concurrents
+    """
+    from app.services.video_research_service import research_viral_scripts
+    from app.services.script_analyzer_service import analyze_script_deeply, synthesize_analyses
+    from app.services.hook_tester_service import generate_and_score_hooks
+    from app.services.persona_service import build_persona
+    from app.services.competitor_service import analyze_competitors
+
+    print(f"[SCRIPT] Lancement recherche multi-agents pour: {topic}")
+
+    # Lancer recherche vidéos + persona + concurrents en parallèle
+    research_task = research_viral_scripts(topic)
+    persona_task = asyncio.get_event_loop().run_in_executor(None, build_persona, topic, "tiktok")
+    competitor_task = analyze_competitors(topic)
+
+    research, persona, competitors = await asyncio.gather(
+        research_task, persona_task, competitor_task,
+        return_exceptions=True
+    )
+
+    if isinstance(research, Exception):
+        research = {}
+        print(f"[SCRIPT] Research failed: {research}")
+    if isinstance(persona, Exception):
+        persona = {}
+    if isinstance(competitors, Exception):
+        competitors = {}
+
+    # Analyser en profondeur les transcripts obtenus (Agent 1)
+    deep_analyses = []
+    transcripts = research.get("transcripts", []) if isinstance(research, dict) else []
+    for t in transcripts[:3]:
+        try:
+            analysis = await asyncio.get_event_loop().run_in_executor(
+                None, analyze_script_deeply, t.get("text", ""), t.get("title", "")
+            )
+            if analysis:
+                deep_analyses.append(analysis)
+        except Exception:
+            pass
+
+    synthesis = {}
+    if deep_analyses:
+        try:
+            synthesis = await asyncio.get_event_loop().run_in_executor(
+                None, synthesize_analyses, deep_analyses
+            )
+        except Exception:
+            pass
+
+    # Générer et scorer 5 hooks (Agent 2)
+    analysis_context = synthesis.get("key_insight", "") if synthesis else ""
+    hooks = []
+    try:
+        hooks = await asyncio.get_event_loop().run_in_executor(
+            None, generate_and_score_hooks, topic, analysis_context
+        )
+    except Exception:
+        pass
+
+    print(f"[SCRIPT] Research: {research.get('videos_found', 0) if isinstance(research, dict) else 0} vidéos | Deep analyses: {len(deep_analyses)} | Hooks: {len(hooks)} | Persona: {'OK' if persona else 'KO'} | Competitors: {'OK' if competitors else 'KO'}")
+
+    return {
+        "research": research if isinstance(research, dict) else {},
+        "synthesis": synthesis,
+        "hooks": hooks,
+        "persona": persona if isinstance(persona, dict) else {},
+        "competitors": competitors if isinstance(competitors, dict) else {},
+    }
+
+
+def _build_mega_context(data: dict, topic: str) -> str:
+    """Construit le contexte complet pour la génération du script."""
+    parts = []
+
+    # Agent 1 — Patterns prouvés
+    synthesis = data.get("synthesis", {})
+    if synthesis:
+        parts.append("=== PATTERNS PROUVÉS DES VRAIS SCRIPTS VIRAUX ===")
+        if synthesis.get("dominant_hook_type"):
+            parts.append(f"Type de hook dominant : {synthesis['dominant_hook_type']}")
+        if synthesis.get("proven_hook_formula"):
+            parts.append(f"Formule de hook prouvée : {synthesis['proven_hook_formula']}")
+        if synthesis.get("recurring_power_words"):
+            parts.append(f"Mots puissants récurrents : {', '.join(synthesis['recurring_power_words'])}")
+        if synthesis.get("emotional_pattern"):
+            parts.append(f"Arc émotionnel dominant : {synthesis['emotional_pattern']}")
+        if synthesis.get("common_retention_technique"):
+            parts.append(f"Technique rétention prouvée : {synthesis['common_retention_technique']}")
+        if synthesis.get("optimal_rhythm"):
+            parts.append(f"Rythme optimal : {synthesis['optimal_rhythm']}")
+        if synthesis.get("proven_cta"):
+            parts.append(f"CTA prouvé : {synthesis['proven_cta']}")
+        if synthesis.get("key_insight"):
+            parts.append(f"Insight clé : {synthesis['key_insight']}")
+
+    # Agent 2 — Meilleur hook
+    hooks = data.get("hooks", [])
+    if hooks:
+        best_hook = hooks[0]
+        parts.append(f"\n=== MEILLEUR HOOK TESTÉ ET SCORÉ (score: {best_hook.get('score', '?')}/10) ===")
+        parts.append(f"Hook : \"{best_hook.get('hook', '')}\"")
+        parts.append(f"Type : {best_hook.get('type', '')} | Trigger : {best_hook.get('trigger', '')}")
+        parts.append(f"Pourquoi il accroche : {best_hook.get('why', '')}")
+        if len(hooks) > 1:
+            parts.append(f"Hook alternatif : \"{hooks[1].get('hook', '')}\" (score: {hooks[1].get('score', '?')}/10)")
+
+    # Agent 3 — Persona
+    persona = data.get("persona", {})
+    if persona:
+        parts.append(f"\n=== PROFIL DU SPECTATEUR CIBLE ===")
+        if persona.get("profile"):
+            parts.append(f"Profil : {persona['profile']}")
+        if persona.get("main_pain"):
+            parts.append(f"Douleur principale : {persona['main_pain']}")
+        if persona.get("main_desire"):
+            parts.append(f"Désir profond : {persona['main_desire']}")
+        if persona.get("trigger_emotion"):
+            parts.append(f"Émotion déclencheuse : {persona['trigger_emotion']}")
+        if persona.get("scroll_stopper"):
+            parts.append(f"Ce qui l'arrête : {persona['scroll_stopper']}")
+        if persona.get("language"):
+            parts.append(f"Son vocabulaire : {persona['language']}")
+
+    # Agent 5 — Concurrents
+    competitors = data.get("competitors", {})
+    if competitors:
+        parts.append(f"\n=== ANALYSE CONCURRENTS ===")
+        if competitors.get("gap_opportunity"):
+            parts.append(f"Opportunité non exploitée : {competitors['gap_opportunity']}")
+        if competitors.get("differentiation"):
+            parts.append(f"Comment se différencier : {competitors['differentiation']}")
+        if competitors.get("successful_title_patterns"):
+            parts.append(f"Patterns titres qui marchent : {' | '.join(competitors['successful_title_patterns'][:2])}")
+
+    # Recherche brute
+    research = data.get("research", {})
+    if research.get("best_hooks"):
+        parts.append(f"\n=== HOOKS VIRAUX DES VRAIES VIDÉOS ===")
+        for h in research["best_hooks"][:3]:
+            parts.append(f"- {h}")
+    if research.get("key_facts"):
+        parts.append(f"\n=== FAITS RÉELS À INTÉGRER ===")
+        for f in research["key_facts"][:3]:
+            parts.append(f"- {f}")
+
+    return "\n".join(parts)
 
 
 async def generate_script(topic: str, duration: int = 60, style: str = "viral", hook_type: str = "auto") -> str:
-    from app.services.viral_research_service import research_viral_patterns
-    client = Groq(api_key=settings.GROQ_API_KEY)
-
-    target_words = WORD_COUNTS.get(duration, 130)
+    """
+    Génère un script viral en utilisant les 5 agents :
+    1. Analyse profonde des vrais scripts
+    2. Multi-hook testé et scoré
+    3. Persona/audience ciblée
+    4. (Validateur intégré dans pipeline_service)
+    5. Analyse concurrents
+    """
+    target_words = WORD_COUNTS.get(duration, 140)
     style_note = STYLE_INSTRUCTIONS.get(style, STYLE_INSTRUCTIONS["viral"])
-    hook_instruction = HOOK_TYPES.get(hook_type, HOOK_TYPES["auto"])
 
     hook_sec = min(5, duration // 10)
     cta_sec = min(10, duration // 8)
     content_sec = duration - hook_sec - cta_sec
 
-    # Étape 1 : Recherche de vrais scripts viraux YouTube sur ce sujet
-    research_context = ""
+    # Lancer tous les agents en parallèle
     try:
-        from app.services.video_research_service import research_viral_scripts
-        research = await research_viral_scripts(topic)
-        print(f"[SCRIPT] Research: {research.get('videos_found', 0)} vidéos, {research.get('transcripts_extracted', 0)} transcripts")
-
-        if research.get("best_hooks") or research.get("viral_patterns"):
-            research_context = f"""
-ANALYSE DE VRAIS SCRIPTS VIRAUX SUR CE SUJET (inspiré de YouTube) :
-- Hooks qui cartonnent vraiment : {' | '.join(research.get('best_hooks', [])[:3])}
-- Patterns viraux récurrents : {' | '.join(research.get('viral_patterns', [])[:3])}
-- Faits concrets à intégrer : {' | '.join(research.get('key_facts', [])[:3])}
-- Ton qui marche : {research.get('tone', 'viral et direct')}
-- Structure narrative gagnante : {research.get('structure', 'hook fort + contenu dense + CTA')}
-- À éviter absolument : {' | '.join(research.get('avoided', []))}
-
-IMPORTANT : inspire-toi FORTEMENT de ces patterns réels pour créer quelque chose de similaire mais unique.
-"""
+        data = await _run_all_research(topic, style)
+        mega_context = _build_mega_context(data, topic)
     except Exception as e:
-        print(f"[SCRIPT] Recherche vidéos échouée: {e}")
+        print(f"[SCRIPT] Erreur agents: {e}")
+        mega_context = ""
+        data = {}
 
-    prompt = f"""Crée un script VIRAL de {duration} secondes (~{target_words} mots).
+    # Utiliser le meilleur hook généré par l'Agent 2
+    best_hook = ""
+    if data.get("hooks"):
+        best_hook = data["hooks"][0].get("hook", "")
+
+    client = Groq(api_key=settings.GROQ_API_KEY)
+
+    prompt = f"""Crée un script viral COMPLET et FLUIDE de {duration} secondes (~{target_words} mots).
 
 SUJET : {topic}
 STYLE : {style_note}
-{research_context}
 
-HOOK ({hook_sec}s) :
-{hook_instruction}
-- Maximum 10 mots
-- PAS de "Bonjour", PAS d'introduction — directement dans le vif
-- Utilise les patterns viraux analysés ci-dessus
-- Déclenche immédiatement l'émotion cible
-- N'utilise PAS le titre du sujet mot pour mot
+{mega_context}
 
-CONTENU ({content_sec}s) :
-- Intègre les faits clés et angles viraux de la recherche
-- Parle directement à la douleur de l'audience
-- Faits précis avec chiffres (73%, 30 jours, 500€)
-- Phrases courtes max 8 mots
-- Boucles ouvertes entre chaque point — maintiens la tension
-
-CTA ({cta_sec}s) :
-- Utilise le CTA viral identifié
-- Question qui provoque des commentaires
-- Naturel, pas forcé
+STRUCTURE :
+- HOOK ({hook_sec}s) : {"Utilise ce hook prouvé : \"" + best_hook + "\"" if best_hook else "Utilise les patterns prouvés ci-dessus pour créer un hook ultra-fort"}
+- CONTENU ({content_sec}s) : développe en utilisant les faits réels, la douleur du persona, les techniques de rétention prouvées
+- CTA ({cta_sec}s) : utilise le CTA prouvé, question engageante
 
 RÈGLES ABSOLUES :
-- UNIQUEMENT le texte à dire à voix haute — comme si tu parlais à un ami
-- PHRASES COMPLÈTES avec sujet + verbe + complément — jamais de fragments
-- INTERDIT : listes, tirets, numéros, bullet points, annotations
-- INTERDIT : phrases de moins de 5 mots sauf le hook
-- Environ {target_words} mots — le script DOIT être long enough pour {duration} secondes
-- Langage parlé naturel français — conversationnel, pas des titres
-- Commence directement par le hook, sans préambule
-- EXEMPLE de bon rythme : "Tu ne sais pas encore que 73% des gens qui essaient l'IA perdent du temps à cause d'une seule erreur. Et cette erreur, tout le monde la fait."
-- Écris le SCRIPT COMPLET du début à la fin"""
+- PHRASES COMPLÈTES — jamais de fragments ou bullet points
+- Max 8-10 mots par phrase
+- {target_words} mots minimum — script COMPLET du début à la fin
+- Langage parlé naturel, conversationnel
+- Zéro fausse promesse
+- Commence directement par le hook, aucun préambule
+- EXEMPLE de bon rythme : "73% des gens qui essaient ça font une erreur fatale. Et personne ne leur dit laquelle. Jusqu'à aujourd'hui."
+
+Écris le script complet maintenant :"""
 
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
@@ -118,7 +239,7 @@ RÈGLES ABSOLUES :
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ],
-        max_tokens=2500,
-        temperature=0.85,
+        max_tokens=3000,
+        temperature=0.82,
     )
     return response.choices[0].message.content.strip()

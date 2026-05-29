@@ -85,6 +85,21 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
                 script = await script_service.generate_script(topic, duration, style, hook_type)
                 script = _clean_script(script)
 
+        # Agent 4 — Validation du script
+        if not script_override:
+            try:
+                from app.services.script_validator_service import validate_script
+                validation = validate_script(script, topic, duration)
+                score = validation.get("scores", {}).get("overall", 5)
+                print(f"[PIPELINE] Validation score: {score}/10 | Mots: {validation.get('word_count', 0)}")
+
+                if validation.get("regenerate") or score < 6:
+                    print(f"[PIPELINE] Score insuffisant ({score}/10), régénération...")
+                    script = await script_service.generate_script(topic, duration, style, hook_type)
+                    script = _clean_script(script)
+            except Exception as e:
+                print(f"[PIPELINE] Validation error: {e}")
+
         print(f"[PIPELINE] Script final: {len(script.split())} mots")
         await _update_job(job_id, status="generating_audio", script=script)
 
