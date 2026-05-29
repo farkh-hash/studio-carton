@@ -161,6 +161,14 @@ studio-carton/
 ### Session 1 — 2026-05-28
 - Initialisation, déploiement Railway, premiers essais
 
+### Session 3 — 2026-05-30
+- Agent Monétisation : niche #1 = Immobilier (6500-14400€/mois), #2 = IA (4400-10000€/mois)
+- Agent Tendances : multi-plateformes (YouTube FR/BE/CA + Google Trends + TikTok + Instagram + Reddit)
+- Pipeline Scénario : dialogue ALEX/SARAH multi-voix avec fond vidéo
+- YouTube Data API v3 activée et configurée
+- Correction crash démarrage (imports lazy dans pipeline_service)
+- Persistence volume Railway /data confirmée
+
 ### Session 2 — 2026-05-29
 - Pipeline complet fonctionnel
 - Remplacement Anthropic → Groq, ElevenLabs → edge-tts → gTTS
