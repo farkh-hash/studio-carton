@@ -42,45 +42,66 @@ Règles absolues :
 
 
 async def generate_script(topic: str, duration: int = 60, style: str = "viral", hook_type: str = "auto") -> str:
+    from app.services.viral_research_service import research_viral_patterns
     client = Groq(api_key=settings.GROQ_API_KEY)
 
     target_words = WORD_COUNTS.get(duration, 130)
     style_note = STYLE_INSTRUCTIONS.get(style, STYLE_INSTRUCTIONS["viral"])
     hook_instruction = HOOK_TYPES.get(hook_type, HOOK_TYPES["auto"])
 
-    # Structure proportionnelle à la durée
     hook_sec = min(5, duration // 10)
     cta_sec = min(10, duration // 8)
     content_sec = duration - hook_sec - cta_sec
 
-    prompt = f"""Crée un script complet de {duration} secondes (~{target_words} mots).
+    # Étape 1 : Recherche des patterns viraux sur ce sujet
+    try:
+        research = await research_viral_patterns(topic)
+        research_context = f"""
+ANALYSE VIRALE DU SUJET (base-toi sur ces insights) :
+- Hooks qui cartonnent : {' | '.join(research.get('top_hooks', [])[:2])}
+- Angles viraux : {' | '.join(research.get('viral_angles', [])[:2])}
+- Faits clés à intégrer : {' | '.join(research.get('key_facts', [])[:3])}
+- Douleur cible de l'audience : {research.get('target_pain', '')}
+- Émotion à déclencher : {research.get('emotion_target', 'curiosité')}
+- Format qui performe : {research.get('best_format', '')}
+- CTA viral : {research.get('viral_cta', '')}
+- Erreurs à éviter : {' | '.join(research.get('forbidden_mistakes', []))}
+"""
+    except Exception as e:
+        print(f"[SCRIPT] Recherche virale échouée: {e}")
+        research_context = ""
+
+    prompt = f"""Crée un script VIRAL de {duration} secondes (~{target_words} mots).
 
 SUJET : {topic}
 STYLE : {style_note}
+{research_context}
 
 HOOK ({hook_sec}s) :
 {hook_instruction}
 - Maximum 10 mots
-- PAS de "Bonjour", PAS d'introduction, directement dans le vif
-- Le spectateur DOIT rester pour la suite
-- N'utilise PAS le titre du sujet mot pour mot — reformule en concept court et percutant
+- PAS de "Bonjour", PAS d'introduction — directement dans le vif
+- Utilise les patterns viraux analysés ci-dessus
+- Déclenche immédiatement l'émotion cible
+- N'utilise PAS le titre du sujet mot pour mot
 
 CONTENU ({content_sec}s) :
-- Développe avec des faits précis, chiffres concrets, exemples réels
-- Phrases courtes (max 8 mots)
-- Boucles ouvertes entre chaque point
-- Rythme soutenu, pas de ralentissement
+- Intègre les faits clés et angles viraux de la recherche
+- Parle directement à la douleur de l'audience
+- Faits précis avec chiffres (73%, 30 jours, 500€)
+- Phrases courtes max 8 mots
+- Boucles ouvertes entre chaque point — maintiens la tension
 
 CTA ({cta_sec}s) :
-- Question engageante liée au contenu
-- Appel à l'action naturel (abonne, commente, partage)
-- Pas forcé, intégré naturellement
+- Utilise le CTA viral identifié
+- Question qui provoque des commentaires
+- Naturel, pas forcé
 
-RÈGLES CRITIQUES :
-- Écris UNIQUEMENT le texte à dire à voix haute
-- Pas d'annotations [HOOK], [CTA], pas de tirets, pas de numéros
-- Langage parlé naturel
-- Le script doit faire environ {target_words} mots — pas moins !
+RÈGLES :
+- UNIQUEMENT le texte à dire à voix haute
+- Pas d'annotations, pas de tirets, pas de numéros
+- Langage parlé naturel, familier
+- Environ {target_words} mots minimum
 - Commence directement par le hook"""
 
     response = client.chat.completions.create(
