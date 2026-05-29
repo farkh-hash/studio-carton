@@ -10,6 +10,7 @@ aiosqlite==0.20.0
 aiofiles==24.1.0
 python-jose==3.3.0
 groq>=0.11.0
+youtube-transcript-api>=0.6.2
 stripe>=7.0.0
 moviepy==1.0.3
 Pillow>=9.5.0

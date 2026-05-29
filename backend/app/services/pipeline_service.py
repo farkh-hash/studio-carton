@@ -54,6 +54,22 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
             script = script_override
         else:
             script = await script_service.generate_script(topic, duration, style, hook_type)
+
+        # Nettoyage encodage — supprime les artefacts UTF-8 mal décodés
+        import unicodedata
+        script = unicodedata.normalize("NFC", script)
+        # Remplace les caractères spéciaux problématiques pour TTS
+        script = script.replace("", "€").replace("â¬", "€")
+        script = script.replace("Ã©", "é").replace("Ã ", "à").replace("Ã¨", "è")
+        script = script.replace("Ã§", "ç").replace("Ã¢", "â").replace("Ãª", "ê")
+        script = script.replace("Ã®", "î").replace("Ã´", "ô").replace("Ã»", "û")
+        script = script.replace("Ã¹", "ù").replace("Ã«", "ë").replace("Ã¯", "ï")
+        # Supprimer les espaces multiples et lignes vides
+        import re
+        script = re.sub(r'\n\s*\n', '\n', script)
+        script = re.sub(r'[ \t]+', ' ', script)
+        script = '\n'.join(line.strip() for line in script.split('\n') if line.strip())
+
         await _update_job(job_id, status="generating_audio", script=script)
 
         (audio_bytes, word_boundaries), bg_video_path = await asyncio.gather(

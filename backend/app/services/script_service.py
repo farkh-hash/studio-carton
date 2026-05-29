@@ -53,23 +53,27 @@ async def generate_script(topic: str, duration: int = 60, style: str = "viral", 
     cta_sec = min(10, duration // 8)
     content_sec = duration - hook_sec - cta_sec
 
-    # Étape 1 : Recherche des patterns viraux sur ce sujet
+    # Étape 1 : Recherche de vrais scripts viraux YouTube sur ce sujet
+    research_context = ""
     try:
-        research = await research_viral_patterns(topic)
-        research_context = f"""
-ANALYSE VIRALE DU SUJET (base-toi sur ces insights) :
-- Hooks qui cartonnent : {' | '.join(research.get('top_hooks', [])[:2])}
-- Angles viraux : {' | '.join(research.get('viral_angles', [])[:2])}
-- Faits clés à intégrer : {' | '.join(research.get('key_facts', [])[:3])}
-- Douleur cible de l'audience : {research.get('target_pain', '')}
-- Émotion à déclencher : {research.get('emotion_target', 'curiosité')}
-- Format qui performe : {research.get('best_format', '')}
-- CTA viral : {research.get('viral_cta', '')}
-- Erreurs à éviter : {' | '.join(research.get('forbidden_mistakes', []))}
+        from app.services.video_research_service import research_viral_scripts
+        research = await research_viral_scripts(topic)
+        print(f"[SCRIPT] Research: {research.get('videos_found', 0)} vidéos, {research.get('transcripts_extracted', 0)} transcripts")
+
+        if research.get("best_hooks") or research.get("viral_patterns"):
+            research_context = f"""
+ANALYSE DE VRAIS SCRIPTS VIRAUX SUR CE SUJET (inspiré de YouTube) :
+- Hooks qui cartonnent vraiment : {' | '.join(research.get('best_hooks', [])[:3])}
+- Patterns viraux récurrents : {' | '.join(research.get('viral_patterns', [])[:3])}
+- Faits concrets à intégrer : {' | '.join(research.get('key_facts', [])[:3])}
+- Ton qui marche : {research.get('tone', 'viral et direct')}
+- Structure narrative gagnante : {research.get('structure', 'hook fort + contenu dense + CTA')}
+- À éviter absolument : {' | '.join(research.get('avoided', []))}
+
+IMPORTANT : inspire-toi FORTEMENT de ces patterns réels pour créer quelque chose de similaire mais unique.
 """
     except Exception as e:
-        print(f"[SCRIPT] Recherche virale échouée: {e}")
-        research_context = ""
+        print(f"[SCRIPT] Recherche vidéos échouée: {e}")
 
     prompt = f"""Crée un script VIRAL de {duration} secondes (~{target_words} mots).
 
