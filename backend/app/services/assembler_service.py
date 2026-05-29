@@ -49,7 +49,9 @@ def _build_video_bg(clip_paths: List[str], duration: float):
     clips = []
     for path in clip_paths:
         try:
+            print(f"[ASSEMBLER] Loading clip: {path}")
             c = VideoFileClip(path, audio=False)
+            print(f"[ASSEMBLER] Clip size: {c.size}, duration: {c.duration:.1f}s")
             # Crop centre pour obtenir 9:16
             orig_w, orig_h = c.size
             target_ratio = WIDTH / HEIGHT
@@ -63,10 +65,13 @@ def _build_video_bg(clip_paths: List[str], duration: float):
                 y1 = (orig_h - new_h) // 2
                 c = c.crop(y1=y1, y2=y1 + new_h)
             c = c.resize((WIDTH, HEIGHT))
+            print(f"[ASSEMBLER] Clip processed OK -> {c.size}")
             clips.append(c)
-        except Exception:
+        except Exception as e:
+            print(f"[ASSEMBLER] Clip error: {e}")
             continue
 
+    print(f"[ASSEMBLER] {len(clips)} clips loaded")
     if not clips:
         return None
 
