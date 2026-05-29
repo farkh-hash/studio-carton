@@ -67,7 +67,7 @@ async def _run_scenario_pipeline(job_id: int, topic: str, duration: int, scenari
             """Télécharge des clips pour chaque personnage."""
             if not settings.PEXELS_API_KEY:
                 return {}
-            from app.services.background_service import fetch_character_clips as fetch_char
+            from app.services.background_service import fetch_character_clips as fetch_char, fetch_background_clips, build_background_video
             from app.services.scenario_script_service import CHARACTERS
             clips = {}
             # Extraire des mots-clés du topic pour contextualiser les clips
@@ -86,11 +86,31 @@ async def _run_scenario_pipeline(job_id: int, topic: str, duration: int, scenari
                     print(f"[SCENARIO] Clip {char} error: {e}")
             return clips
 
-        audio_segments, character_clips = await asyncio.gather(
+        async def get_bg_video():
+            """Télécharge le fond vidéo Pexels pour le scénario."""
+            if not settings.PEXELS_API_KEY:
+                return None
+            try:
+                clips = await fetch_background_clips(topic, duration)
+                if not clips:
+                    return None
+                bg_path = os.path.join(outputs_dir, f"bg_{job_id}.mp4")
+                ok = build_background_video(clips, duration + 5, bg_path)
+                for p in clips:
+                    try:
+                        os.remove(p)
+                    except Exception:
+                        pass
+                return bg_path if ok else None
+            except Exception as e:
+                print(f"[SCENARIO] BG error: {e}")
+                return None
+
+        audio_segments, character_clips, bg_video_path = await asyncio.gather(
             generate_scenario_audio(scenario),
             get_character_clips(),
+            get_bg_video(),
         )
-        bg_video_path = None
 
         await _update(status="assembling_video")
         video_filename = f"video_{job_id}.mp4"
