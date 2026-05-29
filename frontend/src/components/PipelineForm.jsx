@@ -1,47 +1,109 @@
 import { useState, useEffect } from "react";
 import { generatePipeline } from "../api/client";
+import axios from "axios";
 
 const STYLES = [
-  { value: "viral", label: "Viral — accrocheur, rythme rapide" },
-  { value: "educatif", label: "Éducatif — clair et informatif" },
-  { value: "storytelling", label: "Storytelling — narration émotionnelle" },
-  { value: "humour", label: "Humour — ton léger et fun" },
+  { value: "viral", label: "🔥 Viral" },
+  { value: "educatif", label: "📚 Éducatif" },
+  { value: "storytelling", label: "🎭 Storytelling" },
+  { value: "humour", label: "😄 Humour" },
 ];
 
-export default function PipelineForm({ onJobCreated, initialTopic = "", onTopicUsed }) {
+const HOOKS = [
+  { value: "auto", label: "🤖 Auto (IA choisit)" },
+  { value: "curiosite", label: "🔍 Curiosité" },
+  { value: "choc", label: "⚡ Choc / Surprise" },
+  { value: "identification", label: "🪞 Identification" },
+  { value: "resultat", label: "🎯 Résultat promis" },
+  { value: "contre_intuitif", label: "🔄 Contre-intuitif" },
+];
+
+export default function PipelineForm({ onJobCreated, initialTopic = "", onTopicUsed, userEmail, isPro, credits, onUpgrade, onCreditsUpdate }) {
   const [topic, setTopic] = useState("");
   const [style, setStyle] = useState("viral");
+  const [hookType, setHookType] = useState("auto");
   const [duration, setDuration] = useState(60);
   const [loading, setLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [error, setError] = useState("");
+  const [script, setScript] = useState("");
+  const [step, setStep] = useState("form"); // "form" | "preview"
 
   useEffect(() => {
-    if (initialTopic) {
-      setTopic(initialTopic);
-      onTopicUsed?.();
-    }
+    if (initialTopic) { setTopic(initialTopic); onTopicUsed?.(); }
   }, [initialTopic]);
 
-  const handleSubmit = async (e) => {
+  const handlePreview = async (e) => {
     e.preventDefault();
     if (!topic.trim()) return;
+    setPreviewLoading(true);
+    setError("");
+    try {
+      const res = await axios.post("/api/pipeline/preview-script", { topic, duration, style, hook_type: hookType });
+      setScript(res.data.script);
+      setStep("preview");
+    } catch {
+      setError("Erreur lors de la génération du script.");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!isPro && credits <= 0) { onUpgrade?.(); return; }
     setLoading(true);
     setError("");
     try {
-      const res = await generatePipeline({ topic, style, duration });
+      const res = await generatePipeline({ topic, style, duration, script_override: script }, userEmail);
       onJobCreated(res.data);
+      onCreditsUpdate?.(credits - 1);
+      setStep("form");
+      setScript("");
       setTopic("");
     } catch (err) {
-      setError(err.response?.data?.detail || "Erreur lors de la génération");
+      setError(err.response?.data?.detail || "Erreur lors de la génération.");
     } finally {
       setLoading(false);
     }
   };
 
+  if (step === "preview") {
+    return (
+      <div className="generator-form">
+        <div className="preview-header">
+          <h2 className="form-title">📝 Script généré</h2>
+          <p className="form-subtitle">Vérifie et modifie avant de lancer la vidéo</p>
+        </div>
+        <div className="script-meta">
+          <span>📌 {topic}</span>
+          <span>⏱️ {duration}s</span>
+          <span>🎨 {style}</span>
+        </div>
+        <textarea
+          className="script-editor"
+          value={script}
+          onChange={(e) => setScript(e.target.value)}
+          rows={12}
+        />
+        {error && <p className="error-msg">{error}</p>}
+        <div className="preview-actions">
+          <button className="btn-secondary" onClick={() => setStep("form")}>← Modifier les paramètres</button>
+          <button className="btn-secondary" onClick={handlePreview} disabled={previewLoading}>
+            {previewLoading ? "⏳" : "🔄 Regénérer"}
+          </button>
+          <button className="btn-generate" onClick={handleGenerate} disabled={loading}>
+            {loading ? "⏳ Génération..." : "🎬 Générer la vidéo →"}
+          </button>
+        </div>
+        {!isPro && <p className="credits-note">💳 {credits} crédit{credits !== 1 ? "s" : ""} restant{credits !== 1 ? "s" : ""}</p>}
+      </div>
+    );
+  }
+
   return (
-    <form className="generator-form" onSubmit={handleSubmit}>
+    <form className="generator-form" onSubmit={handlePreview}>
       <h2 className="form-title">Pipeline Viral</h2>
-      <p className="form-subtitle">Script → Voix IA → Sous-titres → Vidéo 9:16</p>
+      <p className="form-subtitle">Script IA → Voix → Sous-titres → Vidéo 9:16</p>
 
       <div className="form-group">
         <label>Sujet de la vidéo</label>
@@ -50,36 +112,39 @@ export default function PipelineForm({ onJobCreated, initialTopic = "", onTopicU
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder="Ex : 5 erreurs des entrepreneurs débutants"
-          disabled={loading}
+          disabled={previewLoading}
         />
       </div>
 
       <div className="form-row">
         <div className="form-group">
           <label>Style</label>
-          <select value={style} onChange={(e) => setStyle(e.target.value)} disabled={loading}>
-            {STYLES.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
+          <select value={style} onChange={(e) => setStyle(e.target.value)} disabled={previewLoading}>
+            {STYLES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </div>
-
+        <div className="form-group">
+          <label>Type de hook</label>
+          <select value={hookType} onChange={(e) => setHookType(e.target.value)} disabled={previewLoading}>
+            {HOOKS.map((h) => <option key={h.value} value={h.value}>{h.label}</option>)}
+          </select>
+        </div>
         <div className="form-group">
           <label>Durée</label>
-          <select value={duration} onChange={(e) => setDuration(Number(e.target.value))} disabled={loading}>
-            <option value={30}>30s — Short punch</option>
-            <option value={60}>60s — Standard TikTok</option>
-            <option value={90}>90s — Format long</option>
-            <option value={120}>2min — YouTube Short</option>
-            <option value={180}>3min — Format premium</option>
+          <select value={duration} onChange={(e) => setDuration(Number(e.target.value))} disabled={previewLoading}>
+            <option value={30}>30s</option>
+            <option value={60}>60s</option>
+            <option value={90}>90s</option>
+            <option value={120}>2min</option>
+            <option value={180}>3min</option>
           </select>
         </div>
       </div>
 
       {error && <p className="error-msg">{error}</p>}
 
-      <button type="submit" className="btn-generate" disabled={loading || !topic.trim()}>
-        {loading ? "Génération en cours..." : "Générer la vidéo"}
+      <button type="submit" className="btn-generate" disabled={previewLoading || !topic.trim()}>
+        {previewLoading ? "⏳ Génération du script..." : "📝 Générer le script →"}
       </button>
     </form>
   );

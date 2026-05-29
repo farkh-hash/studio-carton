@@ -7,8 +7,26 @@ from app.schemas.pipeline import PipelineRequest
 from app.services import pipeline_service
 from app.services import background_service
 from typing import Optional
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
+
+
+class ScriptPreviewRequest(BaseModel):
+    topic: str
+    duration: int = 60
+    style: str = "viral"
+    hook_type: str = "auto"
+
+
+@router.post("/preview-script")
+async def preview_script(req: ScriptPreviewRequest):
+    from app.services import script_service
+    if req.hook_type == "auto":
+        script = await script_service.generate_script(req.topic, req.duration, req.style)
+    else:
+        script = await script_service.generate_script_with_hook(req.topic, req.duration, req.style, req.hook_type)
+    return {"script": script, "topic": req.topic, "duration": req.duration, "style": req.style}
 
 
 @router.post("/generate")
@@ -31,7 +49,7 @@ async def generate(req: PipelineRequest, email: Optional[str] = None, db: aiosql
     await db.commit()
     job_id = cursor.lastrowid
 
-    asyncio.create_task(pipeline_service.run_pipeline(job_id, req.topic, req.style, req.duration))
+    asyncio.create_task(pipeline_service.run_pipeline(job_id, req.topic, req.style, req.duration, req.script_override))
 
     row = await (await db.execute("SELECT * FROM pipeline_jobs WHERE id=?", (job_id,))).fetchone()
     return dict(row)

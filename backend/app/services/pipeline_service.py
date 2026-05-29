@@ -45,12 +45,15 @@ async def _build_background(job_id: int, topic: str, duration: int) -> str | Non
         return None
 
 
-async def run_pipeline(job_id: int, topic: str, style: str, duration: int):
+async def run_pipeline(job_id: int, topic: str, style: str, duration: int, script_override: str = None):
     os.makedirs(_OUTPUTS_DIR, exist_ok=True)
 
     try:
         await _update_job(job_id, status="generating_script")
-        script = await script_service.generate_script(topic, duration, style)
+        if script_override:
+            script = script_override
+        else:
+            script = await script_service.generate_script(topic, duration, style)
         await _update_job(job_id, status="generating_audio", script=script)
 
         # Audio TTS + Background Pexels en parallèle

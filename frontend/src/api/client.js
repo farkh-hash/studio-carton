@@ -14,7 +14,7 @@ export const enhancePrompt = (payload) => api.post("/prompts/enhance", payload);
 export const getOptions = () => api.get("/prompts/options");
 
 // ── Pipeline Viral ────────────────────────────────────────────────────────────
-export const generatePipeline = (payload) => api.post("/pipeline/generate", payload);
+export const generatePipeline = (payload, email) => api.post(`/pipeline/generate${email ? `?email=${encodeURIComponent(email)}` : ""}`, payload);
 export const listPipelineJobs = (limit = 50) => api.get(`/pipeline/?limit=${limit}`);
 export const getPipelineJob = (id) => api.get(`/pipeline/${id}`);
 export const getPipelineStatus = (id) => api.get(`/pipeline/${id}/status`);
