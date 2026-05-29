@@ -111,7 +111,7 @@ SUJET : {topic}
 STYLE : {style_note}
 
 STRUCTURE IMPOSÉE :
-- HOOK ({struct['hook_sec']}s) : Phrase d'accroche directe, choc ou curiosité. PAS de "Bonjour", PAS d'introduction. Directement dans le vif. Le spectateur DOIT rester.
+- HOOK ({struct['hook_sec']}s) : Phrase d'accroche directe, choc ou curiosité. PAS de "Bonjour", PAS d'introduction. Le spectateur DOIT rester. Max 10 mots. N'utilise PAS le titre du sujet mot pour mot — reformule en concept court et percutant.
 - CONTENU ({struct['content_sec']}s) : {struct['points']} points. Chaque point = 1-2 phrases max. Chiffres précis. Rythme soutenu. Boucles ouvertes entre les points.
 - CTA ({struct['cta_sec']}s) : Appel à l'action ancré dans le contenu. Fort et naturel.
 
@@ -136,8 +136,20 @@ Commence directement par le hook, sans préambule."""
     return response.choices[0].message.content.strip()
 
 
+def _extract_concept(topic: str, client) -> str:
+    """Extrait un concept court (2-4 mots) du sujet pour construire le hook."""
+    r = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": f"Résume ce sujet en 2-4 mots maximum (concept clé uniquement, pas de phrase) : '{topic}'. Réponds UNIQUEMENT avec les mots, rien d'autre."}],
+        max_tokens=15,
+        temperature=0.3,
+    )
+    return r.choices[0].message.content.strip().strip('"').strip("'")
+
+
 def _generate_hook(topic: str, hook_type: str, client) -> str:
     """Génère un hook percutant adapté au sujet — pas de template littéral."""
+    concept = _extract_concept(topic, client)
     hook_descriptions = {
         "curiosite": "Formule curiosité : révèle quelque chose que personne ne sait. Ex: 'Ce que personne ne te dit sur [concept court]...' ou 'La vérité cachée sur [concept] va tout changer.'",
         "choc": "Formule choc/surprise : déclaration audacieuse qui contredit une croyance. Ex: 'Tout ce qu'on t'a dit sur [concept] est faux.' ou 'J'ai testé X pendant 30 jours. Le résultat m'a choqué.'",
@@ -150,9 +162,11 @@ def _generate_hook(topic: str, hook_type: str, client) -> str:
 
     desc = hook_descriptions.get(hook_type, hook_descriptions["curiosite"])
 
-    prompt = f"""Génère UN SEUL hook d'accroche pour une vidéo TikTok sur ce sujet : "{topic}"
+    prompt = f"""Génère UN SEUL hook d'accroche pour une vidéo TikTok.
 
-Type de hook à utiliser : {desc}
+SUJET : "{topic}"
+CONCEPT CLÉ (utilise ce mot/groupe court dans le hook) : "{concept}"
+Type de hook : {desc}
 
 RÈGLES STRICTES :
 - Maximum 12 mots
@@ -160,7 +174,8 @@ RÈGLES STRICTES :
 - Utilise des mots courts et percutants
 - Chiffre précis si possible (ex: "83%", "30 jours", "3 erreurs")
 - Crée une boucle ouverte : le spectateur DOIT regarder la suite pour comprendre
-- Adapte naturellement le sujet dans la formule (ne répète pas mot pour mot le titre)
+- Utilise le CONCEPT CLÉ (2-4 mots), PAS le titre complet du sujet
+- NE RÉPÈTE JAMAIS le titre complet verbatim
 - Langue : français naturel parlé
 
 Retourne UNIQUEMENT la phrase d'accroche, rien d'autre."""
