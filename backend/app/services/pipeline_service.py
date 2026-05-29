@@ -77,9 +77,9 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
             script = await script_service.generate_script(topic, duration, style, hook_type)
             script = _clean_script(script)
 
-            # Validation longueur — au moins 1 mot par seconde
+            # Validation longueur — au moins 1.8 mots par seconde (parole naturelle)
             word_count = len(script.split())
-            min_words = max(60, duration)
+            min_words = max(80, int(duration * 1.8))
             if word_count < min_words:
                 print(f"[PIPELINE] Script trop court ({word_count} mots < {min_words}), regeneration...")
                 script = await script_service.generate_script(topic, duration, style, hook_type)
