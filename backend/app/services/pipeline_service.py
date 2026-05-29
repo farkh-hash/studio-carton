@@ -41,14 +41,23 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int):
             await f.write(audio_bytes)
         await _update_job(job_id, status="assembling_video")
 
-        # Étape 3 — Clips vidéo background
-        clip_paths = []
+        # Étape 3 — Vidéo de fond Pexels via ffmpeg
+        bg_video_path = None
         if settings.PEXELS_API_KEY:
             try:
                 clip_paths = await background_service.fetch_background_clips(topic, duration)
-                print(f"[PIPELINE] Pexels clips: {len(clip_paths)}")
+                if clip_paths:
+                    bg_path = os.path.join(_OUTPUTS_DIR, f"bg_{job_id}.mp4")
+                    ok = background_service.build_background_video(clip_paths, duration + 5, bg_path)
+                    if ok:
+                        bg_video_path = bg_path
+                    for p in clip_paths:
+                        try:
+                            os.remove(p)
+                        except Exception:
+                            pass
             except Exception as e:
-                print(f"[PIPELINE] Pexels error: {e}")
+                print(f"[PIPELINE] Background error: {e}")
 
         # Étape 4 — Sous-titres
         from moviepy.editor import AudioFileClip
@@ -68,7 +77,7 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int):
             audio_path,
             chunks,
             video_path,
-            clip_paths,
+            bg_video_path,
         )
 
         video_url = f"/pipeline/{video_filename}"

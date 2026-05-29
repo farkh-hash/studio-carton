@@ -6,7 +6,6 @@ from moviepy.editor import (
     ImageClip,
     VideoFileClip,
     CompositeVideoClip,
-    concatenate_videoclips,
     ColorClip,
 )
 from app.services.subtitle_service import SubtitleChunk
@@ -44,47 +43,6 @@ def _make_fallback_bg(duration: float) -> ImageClip:
     return ImageClip(np.array(img), duration=duration)
 
 
-def _build_video_bg(clip_paths: List[str], duration: float):
-    """Assemble les clips vidéo en fond 9:16 pour couvrir toute la durée."""
-    clips = []
-    for path in clip_paths:
-        try:
-            print(f"[ASSEMBLER] Loading clip: {path}")
-            c = VideoFileClip(path, audio=False)
-            print(f"[ASSEMBLER] Clip size: {c.size}, duration: {c.duration:.1f}s")
-            # Crop centre pour obtenir 9:16
-            orig_w, orig_h = c.size
-            target_ratio = WIDTH / HEIGHT
-            clip_ratio = orig_w / orig_h
-            if clip_ratio > target_ratio:
-                new_w = int(orig_h * target_ratio)
-                x1 = (orig_w - new_w) // 2
-                c = c.crop(x1=x1, x2=x1 + new_w)
-            else:
-                new_h = int(orig_w / target_ratio)
-                y1 = (orig_h - new_h) // 2
-                c = c.crop(y1=y1, y2=y1 + new_h)
-            c = c.resize((WIDTH, HEIGHT))
-            print(f"[ASSEMBLER] Clip processed OK -> {c.size}")
-            clips.append(c)
-        except Exception as e:
-            print(f"[ASSEMBLER] Clip error: {e}")
-            continue
-
-    print(f"[ASSEMBLER] {len(clips)} clips loaded")
-    if not clips:
-        return None
-
-    # Boucler les clips jusqu'à couvrir la durée
-    total = sum(c.duration for c in clips)
-    while total < duration:
-        clips += clips
-        total = sum(c.duration for c in clips)
-
-    bg = concatenate_videoclips(clips).subclip(0, duration)
-    return bg
-
-
 def _make_subtitle_frame(text: str) -> np.ndarray:
     img = Image.new("RGBA", (WIDTH, 300), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -120,20 +78,21 @@ def assemble_video(
     audio_path: str,
     chunks: List[SubtitleChunk],
     output_path: str,
-    clip_paths: List[str] = None,
+    bg_video_path: str = None,
 ) -> str:
     audio = AudioFileClip(audio_path)
     duration = audio.duration
 
-    # Fond vidéo ou fallback dégradé
-    bg = None
-    if clip_paths:
-        bg = _build_video_bg(clip_paths, duration)
-
-    if bg is None:
+    # Fond : vidéo Pexels préparée par ffmpeg, ou fallback dégradé
+    if bg_video_path and os.path.exists(bg_video_path):
+        try:
+            bg = VideoFileClip(bg_video_path, audio=False).subclip(0, duration)
+        except Exception:
+            bg = _make_fallback_bg(duration)
+    else:
         bg = _make_fallback_bg(duration)
 
-    # Overlay sombre semi-transparent pour lisibilité des sous-titres
+    # Overlay sombre pour lisibilité des sous-titres
     overlay = ColorClip(size=(WIDTH, HEIGHT), color=(0, 0, 0), duration=duration).set_opacity(0.45)
 
     # Sous-titres
@@ -165,12 +124,11 @@ def assemble_video(
     audio.close()
     video.close()
 
-    # Nettoyage clips temp
-    if clip_paths:
-        for p in clip_paths:
-            try:
-                os.remove(p)
-            except Exception:
-                pass
+    # Nettoyage fond temp
+    if bg_video_path and os.path.exists(bg_video_path):
+        try:
+            os.remove(bg_video_path)
+        except Exception:
+            pass
 
     return output_path
