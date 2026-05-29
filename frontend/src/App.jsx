@@ -7,6 +7,7 @@ import PipelineGallery from "./components/PipelineGallery";
 import NicheAgent from "./components/NicheAgent";
 import TrendsAgent from "./components/TrendsAgent";
 import ScenarioForm from "./components/ScenarioForm";
+import MonetisationAgent from "./components/MonetisationAgent";
 import LandingPage from "./components/LandingPage";
 import axios from "axios";
 import "./App.css";
@@ -15,7 +16,7 @@ export default function App() {
   const [user, setUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem("sc_user")); } catch { return null; }
   });
-  const [tab, setTab] = useState("trends");
+  const [tab, setTab] = useState("money");
   const [videos, setVideos] = useState([]);
   const [videosLoading, setVideosLoading] = useState(true);
   const [jobs, setJobs] = useState([]);
@@ -92,6 +93,9 @@ export default function App() {
       </header>
 
       <nav className="tabs">
+        <button className={`tab ${tab === "money" ? "active" : ""}`} onClick={() => setTab("money")}>
+          💰 Monétisation
+        </button>
         <button className={`tab ${tab === "trends" ? "active" : ""}`} onClick={() => setTab("trends")}>
           📡 Tendances
         </button>
@@ -110,6 +114,7 @@ export default function App() {
       </nav>
 
       <main className="app-main">
+        {tab === "money" && <MonetisationAgent onTopicSelect={handleTopicSelect} />}
         {tab === "trends" && <TrendsAgent onTopicSelect={handleTopicSelect} />}
         {tab === "niches" && <NicheAgent onTopicSelect={handleTopicSelect} />}
         {tab === "scenario" && (

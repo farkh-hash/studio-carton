@@ -596,3 +596,22 @@ input[type="text"], textarea, select {
 .char-lea .char-name { color: #fbbf24; }
 .cta-block { background: #1e1b4b; border-radius: 8px; padding: 10px 14px; }
 .cta-label { font-size: 11px; color: #6366f1; font-weight: 700; display: block; margin-bottom: 4px; }
+
+/* Monetisation Agent */
+.target-selector { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; font-size: 13px; color: #94a3b8; }
+.target-btn { background: #1a1a2e; border: 1px solid #2d2d3a; color: #94a3b8; padding: 6px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; }
+.target-btn.active { background: #1e1b4b; border-color: #6366f1; color: #a5b4fc; }
+.money-recommendation { background: linear-gradient(135deg, #1e1b4b, #1a1a2e); border: 1px solid #6366f1; border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+.money-recommendation h3 { margin: 0 0 8px; font-size: 16px; }
+.money-recommendation p { color: #e2e8f0; font-size: 14px; margin: 0; line-height: 1.5; }
+.money-plan { background: #1a1a2e; border: 1px solid #2d2d3a; border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+.money-plan h3 { margin: 0 0 14px; font-size: 15px; }
+.plan-steps { display: flex; flex-direction: column; gap: 10px; }
+.plan-step { display: flex; align-items: flex-start; gap: 12px; }
+.step-num { background: #6366f1; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.plan-step p { margin: 0; font-size: 13px; color: #e2e8f0; line-height: 1.5; padding-top: 3px; }
+.revenue-milestone { background: #0f0f13; border: 1px solid #059669; color: #34d399; border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+.money-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 12px; font-size: 13px; font-weight: 700; display: inline-block; margin-top: 4px; }
+.money-score { font-size: 13px; color: #fbbf24; font-weight: 700; }
+.quick-win { color: #fbbf24; font-size: 12px; margin: 4px 0; }
+.content-strategy { margin: 8px 0; }
