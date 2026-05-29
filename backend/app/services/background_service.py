@@ -1,19 +1,39 @@
 import os
 import httpx
-import asyncio
 import tempfile
+from groq import Groq
 from app.core.config import settings
 
-PEXELS_API = "https://api.pexels.com/videos/search"
+PEXELS_VIDEO_API = "https://api.pexels.com/videos/search"
+
+
+def _get_english_keywords(topic: str) -> str:
+    """Utilise Groq pour extraire 3 mots-clés anglais depuis le sujet."""
+    try:
+        client = Groq(api_key=settings.GROQ_API_KEY)
+        resp = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{
+                "role": "user",
+                "content": f"Extract 3 simple English keywords for a Pexels video search about: '{topic}'. Return ONLY the keywords separated by spaces, nothing else. Example: 'morning routine sunrise'"
+            }],
+            max_tokens=20,
+            temperature=0.3,
+        )
+        return resp.choices[0].message.content.strip()
+    except Exception:
+        return "lifestyle motivation success"
 
 
 async def fetch_background_clips(topic: str, duration: int) -> list[str]:
     """Télécharge des clips vidéo Pexels liés au sujet. Retourne les chemins des fichiers."""
-    headers = {"Authorization": settings.PEXELS_API_KEY}
-    params = {"query": topic, "per_page": 5, "orientation": "portrait", "size": "medium"}
+    keywords = _get_english_keywords(topic)
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.get(PEXELS_API, headers=headers, params=params)
+    headers = {"Authorization": settings.PEXELS_API_KEY}
+    params = {"query": keywords, "per_page": 8, "size": "small"}
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        resp = await client.get(PEXELS_VIDEO_API, headers=headers, params=params)
         resp.raise_for_status()
         data = resp.json()
 
@@ -25,26 +45,31 @@ async def fetch_background_clips(topic: str, duration: int) -> list[str]:
     selected = (videos * 10)[:clips_needed]
 
     paths = []
-    async with httpx.AsyncClient(timeout=60) as client:
+    async with httpx.AsyncClient(timeout=90, follow_redirects=True) as client:
         for i, video in enumerate(selected):
-            # Prendre le fichier HD portrait (le plus proche de 1080p)
-            files = sorted(
-                [f for f in video["video_files"] if f.get("width") and f["width"] <= 1080],
-                key=lambda f: f.get("width", 0),
-                reverse=True,
-            )
-            if not files:
-                files = video["video_files"][:1]
-            if not files:
+            # Prendre le fichier SD (plus léger, plus rapide à télécharger)
+            files = video.get("video_files", [])
+            sd_files = [f for f in files if f.get("quality") in ("sd", "hd") and f.get("width", 9999) <= 1280]
+            if not sd_files:
+                sd_files = files
+            if not sd_files:
                 continue
 
-            url = files[0]["link"]
-            tmp = tempfile.NamedTemporaryFile(suffix=f"_bg_{i}.mp4", delete=False)
-            tmp.close()
+            # Prendre le plus petit fichier disponible
+            chosen = min(sd_files, key=lambda f: f.get("width", 9999))
+            url = chosen.get("link", "")
+            if not url:
+                continue
 
-            r = await client.get(url, follow_redirects=True)
-            with open(tmp.name, "wb") as f:
-                f.write(r.content)
-            paths.append(tmp.name)
+            try:
+                tmp = tempfile.NamedTemporaryFile(suffix=f"_bg_{i}.mp4", delete=False)
+                tmp.close()
+                r = await client.get(url)
+                r.raise_for_status()
+                with open(tmp.name, "wb") as f:
+                    f.write(r.content)
+                paths.append(tmp.name)
+            except Exception:
+                continue
 
     return paths
