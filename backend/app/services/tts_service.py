@@ -4,7 +4,6 @@ import os
 import io
 import re
 
-# Voix françaises Microsoft Neural (par ordre de préférence)
 VOICES = [
     "fr-FR-DeniseNeural",
     "fr-FR-HenriNeural",
@@ -14,42 +13,49 @@ VOICES = [
 
 
 def _clean_text(text: str) -> str:
-    """Nettoie le texte pour éviter les erreurs TTS."""
-    # Remplacer les caractères spéciaux non supportés
     text = re.sub(r'[^\w\s\.,;:!?\'\"\-\(\)àâäéèêëîïôöùûüçÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ]', ' ', text)
-    # Normaliser les espaces multiples
     text = re.sub(r'\s+', ' ', text).strip()
-    # Limiter la longueur par segment (edge-tts gère mieux les textes < 5000 chars)
     return text[:4500] if len(text) > 4500 else text
 
 
-async def _try_edge_tts(text: str, voice: str) -> bytes:
+async def _edge_tts_with_timing(text: str, voice: str) -> tuple[bytes, list]:
+    """Retourne (audio_mp3_bytes, word_boundaries).
+    word_boundaries = [{"word": str, "start": float, "end": float}, ...]
+    """
     import edge_tts
-    tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
-    tmp.close()
-    try:
-        communicate = edge_tts.Communicate(text, voice, rate="+5%", volume="+0%")
-        await asyncio.wait_for(communicate.save(tmp.name), timeout=30)
-        with open(tmp.name, "rb") as f:
-            data = f.read()
-        if not data or len(data) < 1000:
-            raise ValueError(f"Audio vide ou trop court ({len(data)} bytes)")
-        return data
-    finally:
-        try:
-            os.remove(tmp.name)
-        except Exception:
-            pass
+
+    audio_chunks = []
+    word_boundaries = []
+
+    communicate = edge_tts.Communicate(text, voice, rate="+5%")
+
+    async for chunk in asyncio.wait_for(communicate.__aiter__().__anext__(), timeout=60) if False else communicate:
+        if chunk["type"] == "audio":
+            audio_chunks.append(chunk["data"])
+        elif chunk["type"] == "WordBoundary":
+            # offset et duration sont en unités de 100 nanosecondes
+            start = chunk["offset"] / 10_000_000
+            duration = chunk["duration"] / 10_000_000
+            word_boundaries.append({
+                "word": chunk["value"],
+                "start": round(start, 3),
+                "end": round(start + duration, 3),
+            })
+
+    audio_bytes = b"".join(audio_chunks)
+    if not audio_bytes or len(audio_bytes) < 1000:
+        raise ValueError(f"Audio vide ({len(audio_bytes)} bytes)")
+
+    print(f"[TTS] edge-tts OK — {voice} — {len(audio_bytes)} bytes — {len(word_boundaries)} mots")
+    return audio_bytes, word_boundaries
 
 
-async def _edge_tts(text: str) -> bytes:
+async def _edge_tts(text: str) -> tuple[bytes, list]:
     text = _clean_text(text)
     last_err = None
     for voice in VOICES:
         try:
-            data = await _try_edge_tts(text, voice)
-            print(f"[TTS] edge-tts OK — voix: {voice} — {len(data)} bytes")
-            return data
+            return await _edge_tts_with_timing(text, voice)
         except Exception as e:
             print(f"[TTS] {voice} échec: {e}")
             last_err = e
@@ -62,13 +68,16 @@ def _gtts_fallback(text: str) -> bytes:
     text = _clean_text(text)
     buf = io.BytesIO()
     gTTS(text=text, lang="fr", slow=False).write_to_fp(buf)
+    print(f"[TTS] gTTS fallback — {len(buf.getvalue())} bytes")
     return buf.getvalue()
 
 
-async def generate_audio(text: str) -> bytes:
+async def generate_audio(text: str) -> tuple[bytes, list]:
+    """Retourne (audio_bytes, word_boundaries). word_boundaries peut être vide (fallback gTTS)."""
     try:
         return await _edge_tts(text)
     except Exception as e:
         print(f"[TTS] edge-tts indisponible ({e}), fallback gTTS")
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, _gtts_fallback, text)
+        audio = await loop.run_in_executor(None, _gtts_fallback, text)
+        return audio, []  # gTTS n'a pas de timestamps

@@ -56,7 +56,7 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
             script = await script_service.generate_script(topic, duration, style)
         await _update_job(job_id, status="generating_audio", script=script)
 
-        audio_bytes, bg_video_path = await asyncio.gather(
+        (audio_bytes, word_boundaries), bg_video_path = await asyncio.gather(
             tts_service.generate_audio(script),
             _build_background(job_id, topic, duration),
         )
@@ -67,12 +67,17 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
 
         await _update_job(job_id, status="assembling_video")
 
-        from moviepy.editor import AudioFileClip
-        audio_clip = AudioFileClip(audio_path)
-        audio_duration = audio_clip.duration
-        audio_clip.close()
-
-        chunks = subtitle_service.build_subtitles(script, audio_duration)
+        # Sous-titres synchronisés si timestamps disponibles (edge-tts), sinon fallback
+        if word_boundaries:
+            chunks = subtitle_service.build_subtitles_from_words(word_boundaries, words_per_chunk=3)
+            print(f"[PIPELINE] Sous-titres synchronisés: {len(chunks)} chunks depuis {len(word_boundaries)} mots")
+        else:
+            from moviepy.editor import AudioFileClip
+            audio_clip = AudioFileClip(audio_path)
+            audio_duration = audio_clip.duration
+            audio_clip.close()
+            chunks = subtitle_service.build_subtitles(script, audio_duration)
+            print(f"[PIPELINE] Sous-titres fallback: {len(chunks)} chunks")
 
         video_filename = f"video_{job_id}.mp4"
         video_path = os.path.join(_OUTPUTS_DIR, video_filename)
