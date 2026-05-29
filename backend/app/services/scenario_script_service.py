@@ -78,14 +78,8 @@ Retourne UNIQUEMENT ce JSON :
 IMPORTANT : Le dialogue TOTAL doit faire au moins {target_words} mots. Compte tes mots !
 JSON uniquement, sans texte autour."""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=3000,
-        temperature=0.88,
-    )
-
-    raw = response.choices[0].message.content.strip()
+    from app.services.groq_client import chat
+    raw = chat([{"role": "user", "content": prompt}], max_tokens=3000, temperature=0.88)
     if "```" in raw:
         raw = raw.split("```")[1]
         if raw.startswith("json"):

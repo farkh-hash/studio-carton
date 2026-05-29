@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     KLING_SECRET_KEY: str = ""
     KLING_API_BASE: str = "https://api.klingai.com"
     GROQ_API_KEY: str = ""
+    GROQ_MODEL_PRIMARY: str = "llama-3.3-70b-versatile"
+    GROQ_MODEL_FALLBACK: str = "llama-3.1-8b-instant"
     PEXELS_API_KEY: str = ""
     YOUTUBE_API_KEY: str = ""
     STRIPE_SECRET_KEY: str = ""
