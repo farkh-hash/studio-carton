@@ -1,4 +1,4 @@
-import anthropic
+from groq import Groq
 from app.core.config import settings
 
 SYSTEM_PROMPT = """Tu es un expert en création de contenu viral pour TikTok, Reels et Shorts.
@@ -12,7 +12,7 @@ Règles absolues :
 
 
 async def generate_script(topic: str, duration: int = 60, style: str = "viral") -> str:
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = Groq(api_key=settings.GROQ_API_KEY)
 
     prompt = f"""Génère un script pour une vidéo de {duration} secondes sur : "{topic}"
 Style : {style}
@@ -30,10 +30,13 @@ Appel à l'action direct (abonner, commenter, partager).
 
 Retourne UNIQUEMENT le texte à lire, sans crochets ni annotations."""
 
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
         max_tokens=1024,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": prompt}],
+        temperature=0.8,
     )
-    return message.content[0].text.strip()
+    return response.choices[0].message.content.strip()
