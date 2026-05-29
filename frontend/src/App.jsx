@@ -6,6 +6,7 @@ import PipelineForm from "./components/PipelineForm";
 import PipelineGallery from "./components/PipelineGallery";
 import NicheAgent from "./components/NicheAgent";
 import TrendsAgent from "./components/TrendsAgent";
+import ScenarioForm from "./components/ScenarioForm";
 import LandingPage from "./components/LandingPage";
 import axios from "axios";
 import "./App.css";
@@ -100,6 +101,9 @@ export default function App() {
         <button className={`tab ${tab === "pipeline" ? "active" : ""}`} onClick={() => setTab("pipeline")}>
           Pipeline Viral
         </button>
+        <button className={`tab ${tab === "scenario" ? "active" : ""}`} onClick={() => setTab("scenario")}>
+          🎭 Scénario
+        </button>
         <button className={`tab ${tab === "kling" ? "active" : ""}`} onClick={() => setTab("kling")}>
           Kling AI
         </button>
@@ -108,6 +112,22 @@ export default function App() {
       <main className="app-main">
         {tab === "trends" && <TrendsAgent onTopicSelect={handleTopicSelect} />}
         {tab === "niches" && <NicheAgent onTopicSelect={handleTopicSelect} />}
+        {tab === "scenario" && (
+          <>
+            <ScenarioForm onJobCreated={(job) => setJobs((prev) => [job, ...prev])} />
+            <section className="gallery-section">
+              <div className="gallery-header">
+                <h2>Mes scénarios</h2>
+                <span className="count">{jobs.filter(j => j.style === "scenario").length}</span>
+              </div>
+              <PipelineGallery
+                jobs={jobs.filter(j => j.style === "scenario")}
+                onUpdate={(u) => setJobs((prev) => prev.map((j) => j.id === u.id ? { ...j, ...u } : j))}
+                onDelete={(id) => setJobs((prev) => prev.filter((j) => j.id !== id))}
+              />
+            </section>
+          </>
+        )}
 
         {tab === "pipeline" && (
           <>
