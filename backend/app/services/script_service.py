@@ -101,12 +101,16 @@ CTA ({cta_sec}s) :
 - Question qui provoque des commentaires
 - Naturel, pas forcé
 
-RÈGLES :
-- UNIQUEMENT le texte à dire à voix haute
-- Pas d'annotations, pas de tirets, pas de numéros
-- Langage parlé naturel, familier
-- Environ {target_words} mots minimum
-- Commence directement par le hook"""
+RÈGLES ABSOLUES :
+- UNIQUEMENT le texte à dire à voix haute — comme si tu parlais à un ami
+- PHRASES COMPLÈTES avec sujet + verbe + complément — jamais de fragments
+- INTERDIT : listes, tirets, numéros, bullet points, annotations
+- INTERDIT : phrases de moins de 5 mots sauf le hook
+- Environ {target_words} mots — le script DOIT être long enough pour {duration} secondes
+- Langage parlé naturel français — conversationnel, pas des titres
+- Commence directement par le hook, sans préambule
+- EXEMPLE de bon rythme : "Tu ne sais pas encore que 73% des gens qui essaient l'IA perdent du temps à cause d'une seule erreur. Et cette erreur, tout le monde la fait."
+- Écris le SCRIPT COMPLET du début à la fin"""
 
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
