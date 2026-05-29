@@ -136,14 +136,51 @@ Commence directement par le hook, sans préambule."""
     return response.choices[0].message.content.strip()
 
 
-async def generate_script_with_hook(topic: str, duration: int, style: str, hook_type: str = "curiosite") -> str:
-    import random
-    hooks = HOOK_FORMULAS.get(hook_type, HOOK_FORMULAS["curiosite"])
-    forced_hook = random.choice(hooks).format(topic=topic)
+def _generate_hook(topic: str, hook_type: str, client) -> str:
+    """Génère un hook percutant adapté au sujet — pas de template littéral."""
+    hook_descriptions = {
+        "curiosite": "Formule curiosité : révèle quelque chose que personne ne sait. Ex: 'Ce que personne ne te dit sur [concept court]...' ou 'La vérité cachée sur [concept] va tout changer.'",
+        "choc": "Formule choc/surprise : déclaration audacieuse qui contredit une croyance. Ex: 'Tout ce qu'on t'a dit sur [concept] est faux.' ou 'J'ai testé X pendant 30 jours. Le résultat m'a choqué.'",
+        "identification": "Formule identification : parle directement à quelqu'un qui galère. Ex: 'Tu fais encore cette erreur avec [concept] ?' ou 'Si tu rates [concept], lis ça maintenant.'",
+        "resultat": "Formule résultat promis : promet un résultat concret avec chiffre précis. Ex: 'La méthode exacte pour [résultat chiffré] en [durée].' ou 'Comment passer de 0 à X en Y jours.'",
+        "contre_intuitif": "Formule contre-intuitif : contredit l'intuition. Ex: 'Arrête de faire ça si tu veux [résultat].' ou 'Moins tu travailles sur [concept], plus tu réussis.'",
+        "nombre": "Formule nombre : utilise un chiffre précis dès le début. Ex: '3 choses sur [concept] que 97% des gens ignorent.' ou 'En 60 secondes tu vas tout comprendre sur [concept].'",
+        "urgence": "Formule urgence : crée un sentiment d'urgence ou de FOMO. Ex: 'Stop ! Regarde ça avant de te lancer dans [concept].' ou 'Si tu ne changes pas ça maintenant, tu vas regretter.'",
+    }
 
+    desc = hook_descriptions.get(hook_type, hook_descriptions["curiosite"])
+
+    prompt = f"""Génère UN SEUL hook d'accroche pour une vidéo TikTok sur ce sujet : "{topic}"
+
+Type de hook à utiliser : {desc}
+
+RÈGLES STRICTES :
+- Maximum 12 mots
+- Commence directement par l'accroche, aucune introduction
+- Utilise des mots courts et percutants
+- Chiffre précis si possible (ex: "83%", "30 jours", "3 erreurs")
+- Crée une boucle ouverte : le spectateur DOIT regarder la suite pour comprendre
+- Adapte naturellement le sujet dans la formule (ne répète pas mot pour mot le titre)
+- Langue : français naturel parlé
+
+Retourne UNIQUEMENT la phrase d'accroche, rien d'autre."""
+
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=60,
+        temperature=0.9,
+    )
+    return response.choices[0].message.content.strip().strip('"').strip("'")
+
+
+async def generate_script_with_hook(topic: str, duration: int, style: str, hook_type: str = "curiosite") -> str:
     client = Groq(api_key=settings.GROQ_API_KEY)
     struct = _get_structure(duration)
     style_note = STYLE_INSTRUCTIONS.get(style, STYLE_INSTRUCTIONS["viral"])
+
+    # Générer un hook propre et adapté au sujet
+    hook = _generate_hook(topic, hook_type, client)
 
     prompt = f"""Crée un script de {duration} secondes.
 
@@ -151,13 +188,13 @@ SUJET : {topic}
 STYLE : {style_note}
 
 HOOK IMPOSÉ — commence EXACTEMENT par :
-"{forced_hook}"
+"{hook}"
 
 STRUCTURE après le hook :
-- CONTENU ({struct['content_sec']}s) : {struct['points']} points clés, phrases courtes, rythme rapide, chiffres précis.
-- CTA ({struct['cta_sec']}s) : appel à l'action fort et naturel.
+- CONTENU ({struct['content_sec']}s) : {struct['points']} points clés, phrases courtes (max 8 mots), rythme rapide, chiffres précis.
+- CTA ({struct['cta_sec']}s) : question engageante + appel à l'action naturel.
 
-RÈGLES : uniquement le texte à lire, pas d'annotations, phrases max 10 mots, langage parlé.
+RÈGLES : uniquement le texte à lire, pas d'annotations, langage parlé naturel.
 
 Continue directement après le hook imposé."""
 

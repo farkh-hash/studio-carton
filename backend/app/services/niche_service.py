@@ -94,10 +94,17 @@ Pour chaque niche retourne un objet JSON avec exactement ces champs :
   - "format" : "30s" ou "60s" ou "90s"
   - "hashtags" : 5 hashtags sans #
 
-Règles pour les hooks :
-- Utilise des formules validées : transformationnel, question curiosité, déclaration audacieuse, contre-intuitif, nombre précis
-- Jamais "Bonjour", jamais d'introduction
-- Phrase courte, choc immédiat, boucle ouverte
+RÈGLES ABSOLUES pour les hooks :
+- Maximum 10 mots par hook
+- PAS de formule générique comme "Découvrez...", "Apprenez...", "Voici..."
+- Utilise UNE de ces formules validées :
+  * Transformationnel : "Je suis passé de [X] à [Y] en [durée]"
+  * Audacieux négatif : "Arrête de [action commune]. Tu perds [perte chiffrée]."
+  * Contre-intuitif : "[Chose commune] est la pire chose à faire pour [résultat]."
+  * Chiffre précis : "[X]% des gens ignorent ça. Et ça les ruine."
+  * Urgence : "Stop. Ce que tu fais avec [concept] va te coûter [conséquence]."
+- Crée une boucle ouverte : le spectateur DOIT regarder la suite
+- Chiffres précis (73%, 30 jours, 500€) plutôt que vagues
 
 Retourne UNIQUEMENT un tableau JSON valide sans texte autour."""
 
