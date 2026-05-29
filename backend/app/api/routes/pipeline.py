@@ -22,10 +22,7 @@ class ScriptPreviewRequest(BaseModel):
 @router.post("/preview-script")
 async def preview_script(req: ScriptPreviewRequest):
     from app.services import script_service
-    if req.hook_type == "auto":
-        script = await script_service.generate_script(req.topic, req.duration, req.style)
-    else:
-        script = await script_service.generate_script_with_hook(req.topic, req.duration, req.style, req.hook_type)
+    script = await script_service.generate_script(req.topic, req.duration, req.style, req.hook_type)
     return {"script": script, "topic": req.topic, "duration": req.duration, "style": req.style}
 
 
@@ -49,7 +46,7 @@ async def generate(req: PipelineRequest, email: Optional[str] = None, db: aiosql
     await db.commit()
     job_id = cursor.lastrowid
 
-    asyncio.create_task(pipeline_service.run_pipeline(job_id, req.topic, req.style, req.duration, req.script_override))
+    asyncio.create_task(pipeline_service.run_pipeline(job_id, req.topic, req.style, req.duration, req.script_override, req.hook_type))
 
     row = await (await db.execute("SELECT * FROM pipeline_jobs WHERE id=?", (job_id,))).fetchone()
     return dict(row)

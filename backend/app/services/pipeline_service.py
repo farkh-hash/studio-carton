@@ -45,7 +45,7 @@ async def _build_background(job_id: int, topic: str, duration: int) -> str | Non
         return None
 
 
-async def run_pipeline(job_id: int, topic: str, style: str, duration: int, script_override: str = None):
+async def run_pipeline(job_id: int, topic: str, style: str, duration: int, script_override: str = None, hook_type: str = "auto"):
     os.makedirs(_OUTPUTS_DIR, exist_ok=True)
 
     try:
@@ -53,7 +53,7 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
         if script_override:
             script = script_override
         else:
-            script = await script_service.generate_script(topic, duration, style)
+            script = await script_service.generate_script(topic, duration, style, hook_type)
         await _update_job(job_id, status="generating_audio", script=script)
 
         (audio_bytes, word_boundaries), bg_video_path = await asyncio.gather(

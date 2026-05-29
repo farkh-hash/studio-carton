@@ -6,6 +6,7 @@ class PipelineRequest(BaseModel):
     topic: str = Field(..., min_length=3, max_length=300)
     style: str = Field(default="viral")
     duration: int = Field(default=60, ge=15, le=180)
+    hook_type: str = Field(default="auto")
     script_override: Optional[str] = None
 
 
