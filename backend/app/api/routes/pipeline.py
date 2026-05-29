@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.db.database import get_db
 from app.schemas.pipeline import PipelineRequest
 from app.services import pipeline_service
+from app.services import background_service
 
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 
@@ -53,3 +54,12 @@ async def delete_job(job_id: int, db: aiosqlite.Connection = Depends(get_db)):
     await db.execute("DELETE FROM pipeline_jobs WHERE id=?", (job_id,))
     await db.commit()
     return {"deleted": True}
+
+
+@router.get("/debug/pexels")
+async def debug_pexels():
+    try:
+        clips = await background_service.fetch_background_clips("morning routine wake up", 30)
+        return {"success": True, "clips_downloaded": len(clips), "paths": clips}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
