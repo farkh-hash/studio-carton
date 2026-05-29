@@ -101,8 +101,8 @@ def _make_dialogue_overlay(character: str, line: str) -> np.ndarray:
     # Fond semi-transparent
     draw.rounded_rectangle([20, 10, WIDTH - 20, 340], radius=20, fill=(0, 0, 0, 210))
 
-    # Ligne colorée du personnage
-    draw.rectangle([20, 10, 8, 340], fill=(*color, 255))
+    # Ligne colorée du personnage (barre verticale)
+    draw.rectangle([40, 10, 48, 105], fill=(*color, 255))
 
     # Texte avec word wrap
     words = line.split()
