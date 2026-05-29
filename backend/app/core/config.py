@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     KLING_API_BASE: str = "https://api.klingai.com"
     GROQ_API_KEY: str = ""
     PEXELS_API_KEY: str = ""
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_ID: str = ""
+    APP_URL: str = "https://sunny-surprise-production-fec2.up.railway.app"
     OUTPUTS_DIR: str = "outputs/videos"
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
     DEBUG: bool = False

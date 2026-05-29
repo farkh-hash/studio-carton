@@ -6,12 +6,24 @@ from app.db.database import get_db
 from app.schemas.pipeline import PipelineRequest
 from app.services import pipeline_service
 from app.services import background_service
+from typing import Optional
 
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 
 
 @router.post("/generate")
-async def generate(req: PipelineRequest, db: aiosqlite.Connection = Depends(get_db)):
+async def generate(req: PipelineRequest, email: Optional[str] = None, db: aiosqlite.Connection = Depends(get_db)):
+    # Vérification des crédits si email fourni
+    if email:
+        user = await (await db.execute("SELECT * FROM users WHERE email=?", (email.lower(),))).fetchone()
+        if user:
+            user = dict(user)
+            if not user["is_pro"] and user["credits"] <= 0:
+                raise HTTPException(status_code=402, detail="Plus de crédits. Passez Pro pour continuer.")
+            if not user["is_pro"]:
+                await db.execute("UPDATE users SET credits=credits-1 WHERE email=?", (email.lower(),))
+                await db.commit()
+
     cursor = await db.execute(
         "INSERT INTO pipeline_jobs (topic, style, duration, status) VALUES (?, ?, ?, 'pending')",
         (req.topic, req.style, req.duration),

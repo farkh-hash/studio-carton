@@ -5,9 +5,14 @@ import VideoGallery from "./components/VideoGallery";
 import PipelineForm from "./components/PipelineForm";
 import PipelineGallery from "./components/PipelineGallery";
 import NicheAgent from "./components/NicheAgent";
+import LandingPage from "./components/LandingPage";
+import axios from "axios";
 import "./App.css";
 
 export default function App() {
+  const [user, setUser] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("sc_user")); } catch { return null; }
+  });
   const [tab, setTab] = useState("niches");
   const [videos, setVideos] = useState([]);
   const [videosLoading, setVideosLoading] = useState(true);
@@ -16,14 +21,49 @@ export default function App() {
   const [pipelineTopic, setPipelineTopic] = useState("");
 
   useEffect(() => {
+    if (!user) return;
     listVideos().then((r) => setVideos(r.data)).catch(console.error).finally(() => setVideosLoading(false));
     listPipelineJobs().then((r) => setJobs(r.data)).catch(console.error).finally(() => setJobsLoading(false));
+  }, [user]);
+
+  // Vérifier les params URL (retour Stripe)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("success") && params.get("email")) {
+      const email = params.get("email");
+      axios.get(`/api/users/${email}`).then((r) => {
+        setUser(r.data);
+        localStorage.setItem("sc_user", JSON.stringify(r.data));
+        window.history.replaceState({}, "", "/");
+      });
+    }
   }, []);
+
+  const handleLogin = (userData) => {
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("sc_user");
+    setUser(null);
+  };
 
   const handleTopicSelect = (topic) => {
     setPipelineTopic(topic);
     setTab("pipeline");
   };
+
+  const handleUpgrade = async () => {
+    if (!user) return;
+    try {
+      const res = await axios.post("/api/users/checkout", { email: user.email });
+      window.location.href = res.data.checkout_url;
+    } catch {
+      alert("Stripe non configuré. Contacte le support.");
+    }
+  };
+
+  if (!user) return <LandingPage onLogin={handleLogin} />;
 
   return (
     <div className="app">
@@ -32,7 +72,17 @@ export default function App() {
           <span className="logo-icon">🎬</span>
           <span>Studio Carton</span>
         </div>
-        <p className="tagline">Génération automatique de vidéos virales TikTok & Reels</p>
+        <div className="header-right">
+          {user.is_pro ? (
+            <span className="badge-pro">⭐ Pro</span>
+          ) : (
+            <div className="credits-bar">
+              <span className="credits-count">{user.credits} vidéo{user.credits !== 1 ? "s" : ""} restante{user.credits !== 1 ? "s" : ""}</span>
+              <button className="btn-upgrade" onClick={handleUpgrade}>Passer Pro →</button>
+            </div>
+          )}
+          <button className="btn-logout" onClick={handleLogout}>{user.email.split("@")[0]}</button>
+        </div>
       </header>
 
       <nav className="tabs">
@@ -48,9 +98,7 @@ export default function App() {
       </nav>
 
       <main className="app-main">
-        {tab === "niches" && (
-          <NicheAgent onTopicSelect={handleTopicSelect} />
-        )}
+        {tab === "niches" && <NicheAgent onTopicSelect={handleTopicSelect} />}
 
         {tab === "pipeline" && (
           <>
@@ -58,6 +106,15 @@ export default function App() {
               onJobCreated={(job) => setJobs((prev) => [job, ...prev])}
               initialTopic={pipelineTopic}
               onTopicUsed={() => setPipelineTopic("")}
+              userEmail={user.email}
+              isPro={user.is_pro}
+              credits={user.credits}
+              onUpgrade={handleUpgrade}
+              onCreditsUpdate={(credits) => {
+                const updated = { ...user, credits };
+                setUser(updated);
+                localStorage.setItem("sc_user", JSON.stringify(updated));
+              }}
             />
             <section className="gallery-section">
               <div className="gallery-header">

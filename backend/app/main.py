@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.db.database import init_db
-from app.api.routes import health, videos, prompts, pipeline, niches
+from app.api.routes import health, videos, prompts, pipeline, niches, users
 
 OUTPUTS_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "../outputs/videos")
@@ -46,6 +46,7 @@ app.include_router(videos.router, prefix="/api")
 app.include_router(prompts.router, prefix="/api")
 app.include_router(pipeline.router, prefix="/api")
 app.include_router(niches.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
 
 app.mount("/videos", StaticFiles(directory=OUTPUTS_DIR), name="videos")
 app.mount("/pipeline", StaticFiles(directory=PIPELINE_DIR), name="pipeline")

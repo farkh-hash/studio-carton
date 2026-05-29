@@ -40,10 +40,23 @@ CREATE TABLE IF NOT EXISTS pipeline_jobs (
 """
 
 
+CREATE_USERS_TABLE = """
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    credits INTEGER DEFAULT 3,
+    is_pro INTEGER DEFAULT 0,
+    stripe_customer_id TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
+
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(CREATE_VIDEOS_TABLE)
         await db.execute(CREATE_PIPELINE_TABLE)
+        await db.execute(CREATE_USERS_TABLE)
         await db.commit()
 
 
