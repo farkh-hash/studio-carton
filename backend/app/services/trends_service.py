@@ -90,52 +90,62 @@ async def _google_trends_fr() -> list[str]:
 
 
 async def _reddit_trending_fr() -> list[dict]:
-    """Récupère les posts viraux des subreddits francophones."""
-    subreddits = [
-        "france", "financepersonnelle", "Entrepreneur_fr",
-        "developpement_personnel", "IA_Francophone"
+    """Récupère les posts viraux via les flux RSS publics francophones."""
+    sources = [
+        ("https://www.reddit.com/r/france/hot.json?limit=5&raw_json=1", "france"),
+        ("https://news.ycombinator.com/rss", "hackernews"),
     ]
-    headers = {"User-Agent": "StudioCarton/1.0"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; StudioCarton/1.0)",
+        "Accept": "application/json, text/xml, */*",
+    }
     posts = []
 
-    async with httpx.AsyncClient(timeout=12, headers=headers) as client:
-        for sub in subreddits:
+    async with httpx.AsyncClient(timeout=10, headers=headers, follow_redirects=True) as client:
+        for url, source in sources:
             try:
-                resp = await client.get(
-                    f"https://www.reddit.com/r/{sub}/hot.json?limit=5",
-                    follow_redirects=True
-                )
-                data = resp.json()
-                for post in data.get("data", {}).get("children", [])[:3]:
-                    p = post.get("data", {})
-                    posts.append({
-                        "title": p.get("title", ""),
-                        "upvotes": p.get("score", 0),
-                        "subreddit": sub,
-                    })
+                resp = await client.get(url)
+                if "json" in url and resp.status_code == 200:
+                    data = resp.json()
+                    for post in data.get("data", {}).get("children", [])[:5]:
+                        p = post.get("data", {})
+                        title = p.get("title", "")
+                        if title:
+                            posts.append({"title": title, "upvotes": p.get("score", 0), "subreddit": source})
+                elif resp.status_code == 200:
+                    # Parse RSS
+                    import re
+                    titles = re.findall(r'<title><!\[CDATA\[(.*?)\]\]></title>', resp.text)
+                    if not titles:
+                        titles = re.findall(r'<title>(.*?)</title>', resp.text)[1:6]
+                    for t in titles[:5]:
+                        posts.append({"title": t, "upvotes": 100, "subreddit": source})
             except Exception:
                 continue
 
-    return sorted(posts, key=lambda x: x["upvotes"], reverse=True)[:15]
+    return posts[:10]
 
 
 async def _tiktok_trends_google() -> list[str]:
-    """Cherche les tendances TikTok France via Google."""
+    """Cherche les tendances virales France via DuckDuckGo (moins restrictif que Google)."""
     queries = [
-        f"tendances tiktok france {date.today().strftime('%B %Y')}",
-        "hashtag viral tiktok france aujourd'hui",
-        "trending tiktok france 2025",
+        f"tendances virales france {date.today().strftime('%B %Y')} tiktok reels",
+        "video virale france finance investissement 2025",
     ]
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0",
         "Accept-Language": "fr-FR,fr;q=0.9",
+        "Accept": "text/html,application/xhtml+xml",
     }
     titles = []
-    async with httpx.AsyncClient(timeout=10, headers=headers) as client:
+    async with httpx.AsyncClient(timeout=12, headers=headers, follow_redirects=True) as client:
         for q in queries[:2]:
             try:
-                resp = await client.get("https://www.google.com/search", params={"q": q, "num": 8, "hl": "fr"})
-                found = re.findall(r'<h3[^>]*>(.*?)</h3>', resp.text, re.DOTALL)
+                resp = await client.get(
+                    "https://html.duckduckgo.com/html/",
+                    params={"q": q, "kl": "fr-fr"},
+                )
+                found = re.findall(r'class="result__a"[^>]*>(.*?)</a>', resp.text, re.DOTALL)
                 for t in found[:5]:
                     clean = re.sub(r'<[^>]+>', '', t).strip()
                     if clean and len(clean) > 10:
