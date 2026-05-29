@@ -1,8 +1,13 @@
 import aiosqlite
 import os
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "../../data/studio_carton.db")
-DB_PATH = os.path.normpath(DB_PATH)
+# Utilise le volume Railway /data si disponible, sinon fallback local
+_DATA_DIR = "/data" if os.path.exists("/data") else os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "../../data_local")
+)
+os.makedirs(_DATA_DIR, exist_ok=True)
+
+DB_PATH = os.path.join(_DATA_DIR, "studio_carton.db")
 
 CREATE_VIDEOS_TABLE = """
 CREATE TABLE IF NOT EXISTS videos (
@@ -23,7 +28,6 @@ CREATE TABLE IF NOT EXISTS videos (
 );
 """
 
-
 CREATE_PIPELINE_TABLE = """
 CREATE TABLE IF NOT EXISTS pipeline_jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,7 +42,6 @@ CREATE TABLE IF NOT EXISTS pipeline_jobs (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 """
-
 
 CREATE_USERS_TABLE = """
 CREATE TABLE IF NOT EXISTS users (

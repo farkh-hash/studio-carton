@@ -6,12 +6,12 @@ import aiofiles
 from app.services import script_service, tts_service, subtitle_service, assembler_service, background_service
 from app.core.config import settings
 
-_DB_PATH = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "../../data/studio_carton.db")
+# Utilise les chemins définis par main.py via env, sinon fallback
+_DATA_DIR = "/data" if os.path.exists("/data") else os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "../../data_local")
 )
-_OUTPUTS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "../../outputs/pipeline")
-)
+_DB_PATH = os.path.join(_DATA_DIR, "studio_carton.db")
+_OUTPUTS_DIR = os.environ.get("PIPELINE_DIR") or os.path.join(_DATA_DIR, "outputs/pipeline")
 
 
 async def _update_job(job_id: int, **kwargs):
@@ -56,7 +56,6 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
             script = await script_service.generate_script(topic, duration, style)
         await _update_job(job_id, status="generating_audio", script=script)
 
-        # Audio TTS + Background Pexels en parallèle
         audio_bytes, bg_video_path = await asyncio.gather(
             tts_service.generate_audio(script),
             _build_background(job_id, topic, duration),
