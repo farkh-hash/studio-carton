@@ -39,13 +39,21 @@ async def _run_all_research(topic: str, style: str) -> dict:
 
     print(f"[SCRIPT] Lancement recherche multi-agents pour: {topic}")
 
-    # Lancer recherche vidéos + persona + concurrents en parallèle
-    research_task = research_viral_scripts(topic)
-    persona_task = asyncio.get_event_loop().run_in_executor(None, build_persona, topic, "tiktok")
-    competitor_task = analyze_competitors(topic)
+    # Lancer recherche vidéos + persona + concurrents en parallèle avec timeout
+    async def safe_research():
+        return await asyncio.wait_for(research_viral_scripts(topic), timeout=25)
+
+    async def safe_persona():
+        return await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(None, build_persona, topic, "tiktok"),
+            timeout=15
+        )
+
+    async def safe_competitors():
+        return await asyncio.wait_for(analyze_competitors(topic), timeout=20)
 
     research, persona, competitors = await asyncio.gather(
-        research_task, persona_task, competitor_task,
+        safe_research(), safe_persona(), safe_competitors(),
         return_exceptions=True
     )
 

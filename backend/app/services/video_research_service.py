@@ -10,15 +10,22 @@ YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
 
 async def _youtube_search(query: str, max_results: int = 10) -> list[dict]:
     """Cherche les vidéos les plus vues sur YouTube via l'API officielle."""
+    if not settings.YOUTUBE_API_KEY:
+        print("[RESEARCH] Pas de YOUTUBE_API_KEY configurée")
+        return []
+
+    # Simplifier la query pour de meilleurs résultats
+    simplified = query[:80] if len(query) > 80 else query
     params = {
         "part": "snippet",
-        "q": query,
+        "q": simplified,
         "type": "video",
         "order": "viewCount",
         "maxResults": max_results,
         "relevanceLanguage": "fr",
         "key": settings.YOUTUBE_API_KEY,
     }
+    print(f"[RESEARCH] YouTube API search: '{simplified}'")
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.get(f"{YOUTUBE_API}/search", params=params)
         resp.raise_for_status()

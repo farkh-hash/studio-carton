@@ -26,7 +26,8 @@ async def _run_edge_tts(text: str, voice: str) -> tuple[bytes, list]:
 
     communicate = edge_tts.Communicate(text, voice, rate="+5%")
 
-    async for chunk in communicate:
+    # Utilise .stream() pour la compatibilité avec toutes les versions
+    async for chunk in communicate.stream():
         if chunk["type"] == "audio":
             audio_chunks.append(chunk["data"])
         elif chunk["type"] == "WordBoundary":
