@@ -113,6 +113,7 @@ export default function NicheAgent({ onTopicSelect }) {
                 </div>
               </div>
               <p className="niche-why">{niche.why}</p>
+              {niche.monetisation_resume && <p className="niche-monetisation">💰 {niche.monetisation_resume}</p>}
               {niche.content_angle && <p className="niche-angle">🎯 {niche.content_angle}</p>}
 
               <div className="niche-topics">

@@ -121,13 +121,14 @@ function JobCard({ job, onUpdate, onDelete }) {
 
   useEffect(() => {
     if (["completed", "failed"].includes(job.status)) return;
+    if (!job.id) return;
     intervalRef.current = setInterval(async () => {
       try {
         const res = await getPipelineStatus(job.id);
         onUpdate(res.data);
         if (["completed", "failed"].includes(res.data.status)) clearInterval(intervalRef.current);
       } catch {}
-    }, 3000);
+    }, 5000);
     return () => clearInterval(intervalRef.current);
   }, [job.id, job.status]);
 
