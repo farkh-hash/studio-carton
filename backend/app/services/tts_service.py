@@ -7,9 +7,9 @@ import re
 VOICES = [
     "fr-FR-DeniseNeural",
     "fr-FR-HenriNeural",
-    "fr-FR-VivienneMultilingualNeural",
     "fr-FR-EloiseNeural",
 ]
+EDGE_TTS_TIMEOUT = 25  # secondes max par voix
 
 
 def _clean_text(text: str) -> str:
@@ -18,10 +18,7 @@ def _clean_text(text: str) -> str:
     return text[:4500] if len(text) > 4500 else text
 
 
-async def _edge_tts_with_timing(text: str, voice: str) -> tuple[bytes, list]:
-    """Retourne (audio_mp3_bytes, word_boundaries).
-    word_boundaries = [{"word": str, "start": float, "end": float}, ...]
-    """
+async def _run_edge_tts(text: str, voice: str) -> tuple[bytes, list]:
     import edge_tts
 
     audio_chunks = []
@@ -29,11 +26,10 @@ async def _edge_tts_with_timing(text: str, voice: str) -> tuple[bytes, list]:
 
     communicate = edge_tts.Communicate(text, voice, rate="+5%")
 
-    async for chunk in asyncio.wait_for(communicate.__aiter__().__anext__(), timeout=60) if False else communicate:
+    async for chunk in communicate:
         if chunk["type"] == "audio":
             audio_chunks.append(chunk["data"])
         elif chunk["type"] == "WordBoundary":
-            # offset et duration sont en unités de 100 nanosecondes
             start = chunk["offset"] / 10_000_000
             duration = chunk["duration"] / 10_000_000
             word_boundaries.append({
@@ -46,21 +42,24 @@ async def _edge_tts_with_timing(text: str, voice: str) -> tuple[bytes, list]:
     if not audio_bytes or len(audio_bytes) < 1000:
         raise ValueError(f"Audio vide ({len(audio_bytes)} bytes)")
 
-    print(f"[TTS] edge-tts OK — {voice} — {len(audio_bytes)} bytes — {len(word_boundaries)} mots")
     return audio_bytes, word_boundaries
 
 
 async def _edge_tts(text: str) -> tuple[bytes, list]:
     text = _clean_text(text)
-    last_err = None
     for voice in VOICES:
         try:
-            return await _edge_tts_with_timing(text, voice)
+            audio, words = await asyncio.wait_for(
+                _run_edge_tts(text, voice),
+                timeout=EDGE_TTS_TIMEOUT
+            )
+            print(f"[TTS] edge-tts OK — {voice} — {len(audio)} bytes — {len(words)} mots")
+            return audio, words
+        except asyncio.TimeoutError:
+            print(f"[TTS] {voice} timeout après {EDGE_TTS_TIMEOUT}s")
         except Exception as e:
             print(f"[TTS] {voice} échec: {e}")
-            last_err = e
-            continue
-    raise ValueError(f"Toutes les voix edge-tts ont échoué: {last_err}")
+    raise ValueError("Toutes les voix edge-tts ont échoué")
 
 
 def _gtts_fallback(text: str) -> bytes:
@@ -73,11 +72,10 @@ def _gtts_fallback(text: str) -> bytes:
 
 
 async def generate_audio(text: str) -> tuple[bytes, list]:
-    """Retourne (audio_bytes, word_boundaries). word_boundaries peut être vide (fallback gTTS)."""
     try:
         return await _edge_tts(text)
     except Exception as e:
         print(f"[TTS] edge-tts indisponible ({e}), fallback gTTS")
         loop = asyncio.get_event_loop()
         audio = await loop.run_in_executor(None, _gtts_fallback, text)
-        return audio, []  # gTTS n'a pas de timestamps
+        return audio, []
