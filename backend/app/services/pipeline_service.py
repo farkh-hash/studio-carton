@@ -3,7 +3,8 @@ import os
 import aiosqlite
 import aiofiles
 
-from app.services import script_service, tts_service, subtitle_service, assembler_service
+from app.services import script_service, tts_service, subtitle_service, assembler_service, background_service
+from app.core.config import settings
 
 _DB_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "../../data/studio_carton.db")
@@ -40,7 +41,15 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int):
             await f.write(audio_bytes)
         await _update_job(job_id, status="assembling_video")
 
-        # Étape 3 — Sous-titres
+        # Étape 3 — Clips vidéo background
+        clip_paths = []
+        if settings.PEXELS_API_KEY:
+            try:
+                clip_paths = await background_service.fetch_background_clips(topic, duration)
+            except Exception:
+                pass
+
+        # Étape 4 — Sous-titres
         from moviepy.editor import AudioFileClip
         audio_clip = AudioFileClip(audio_path)
         audio_duration = audio_clip.duration
@@ -48,7 +57,7 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int):
 
         chunks = subtitle_service.build_subtitles(script, audio_duration)
 
-        # Étape 4 — Assemblage vidéo
+        # Étape 5 — Assemblage vidéo
         video_filename = f"video_{job_id}.mp4"
         video_path = os.path.join(_OUTPUTS_DIR, video_filename)
 
@@ -58,6 +67,7 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int):
             audio_path,
             chunks,
             video_path,
+            clip_paths,
         )
 
         video_url = f"/pipeline/{video_filename}"
