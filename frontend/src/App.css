@@ -389,3 +389,55 @@ input[type="text"], textarea, select {
 @keyframes spin { to { transform: rotate(360deg); } }
 .placeholder-thumb { flex-direction: column; }
 
+
+/* Agent Niches */
+.niche-agent { max-width: 900px; margin: 0 auto; }
+.niche-header { text-align: center; margin-bottom: 32px; }
+.niche-header h2 { font-size: 26px; margin: 0 0 8px; }
+.niche-header p { color: #94a3b8; font-size: 15px; margin: 0 0 20px; }
+.btn-analyze {
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  color: white;
+  border: none;
+  padding: 14px 32px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn-analyze:hover { opacity: 0.85; }
+.btn-analyze:disabled { opacity: 0.5; cursor: default; }
+.niche-loading { text-align: center; padding: 60px; color: #94a3b8; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.niche-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
+.niche-card {
+  background: #1a1a2e;
+  border: 1px solid #2d2d3a;
+  border-radius: 16px;
+  padding: 20px;
+  transition: border-color 0.2s;
+}
+.niche-card:hover { border-color: #6366f1; }
+.niche-card-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 12px; }
+.niche-emoji { font-size: 36px; line-height: 1; }
+.niche-card-header h3 { margin: 0 0 6px; font-size: 16px; text-transform: capitalize; }
+.niche-score { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.score-num { color: #94a3b8; font-size: 12px; }
+.niche-why { color: #94a3b8; font-size: 13px; margin: 0 0 14px; line-height: 1.5; }
+.niche-topics { display: flex; flex-direction: column; gap: 8px; }
+.topic-btn {
+  background: #0f0f13;
+  border: 1px solid #2d2d3a;
+  color: #c4b5fd;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.topic-btn:hover { background: #1e1b4b; border-color: #6366f1; color: #e2e8f0; }
+.topic-btn span { color: #6366f1; flex-shrink: 0; margin-top: 1px; }

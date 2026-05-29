@@ -4,19 +4,26 @@ import GeneratorForm from "./components/GeneratorForm";
 import VideoGallery from "./components/VideoGallery";
 import PipelineForm from "./components/PipelineForm";
 import PipelineGallery from "./components/PipelineGallery";
+import NicheAgent from "./components/NicheAgent";
 import "./App.css";
 
 export default function App() {
-  const [tab, setTab] = useState("pipeline");
+  const [tab, setTab] = useState("niches");
   const [videos, setVideos] = useState([]);
   const [videosLoading, setVideosLoading] = useState(true);
   const [jobs, setJobs] = useState([]);
   const [jobsLoading, setJobsLoading] = useState(true);
+  const [pipelineTopic, setPipelineTopic] = useState("");
 
   useEffect(() => {
     listVideos().then((r) => setVideos(r.data)).catch(console.error).finally(() => setVideosLoading(false));
     listPipelineJobs().then((r) => setJobs(r.data)).catch(console.error).finally(() => setJobsLoading(false));
   }, []);
+
+  const handleTopicSelect = (topic) => {
+    setPipelineTopic(topic);
+    setTab("pipeline");
+  };
 
   return (
     <div className="app">
@@ -29,6 +36,9 @@ export default function App() {
       </header>
 
       <nav className="tabs">
+        <button className={`tab ${tab === "niches" ? "active" : ""}`} onClick={() => setTab("niches")}>
+          🤖 Agent Niches
+        </button>
         <button className={`tab ${tab === "pipeline" ? "active" : ""}`} onClick={() => setTab("pipeline")}>
           Pipeline Viral
         </button>
@@ -38,9 +48,17 @@ export default function App() {
       </nav>
 
       <main className="app-main">
+        {tab === "niches" && (
+          <NicheAgent onTopicSelect={handleTopicSelect} />
+        )}
+
         {tab === "pipeline" && (
           <>
-            <PipelineForm onJobCreated={(job) => setJobs((prev) => [job, ...prev])} />
+            <PipelineForm
+              onJobCreated={(job) => setJobs((prev) => [job, ...prev])}
+              initialTopic={pipelineTopic}
+              onTopicUsed={() => setPipelineTopic("")}
+            />
             <section className="gallery-section">
               <div className="gallery-header">
                 <h2>Mes vidéos virales</h2>

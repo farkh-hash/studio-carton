@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { generatePipeline } from "../api/client";
 
 const STYLES = [
@@ -8,12 +8,19 @@ const STYLES = [
   { value: "humour", label: "Humour — ton léger et fun" },
 ];
 
-export default function PipelineForm({ onJobCreated }) {
+export default function PipelineForm({ onJobCreated, initialTopic = "", onTopicUsed }) {
   const [topic, setTopic] = useState("");
   const [style, setStyle] = useState("viral");
   const [duration, setDuration] = useState(60);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (initialTopic) {
+      setTopic(initialTopic);
+      onTopicUsed?.();
+    }
+  }, [initialTopic]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -58,7 +65,7 @@ export default function PipelineForm({ onJobCreated }) {
         </div>
 
         <div className="form-group">
-          <label>Durée (secondes)</label>
+          <label>Durée</label>
           <select value={duration} onChange={(e) => setDuration(Number(e.target.value))} disabled={loading}>
             <option value={30}>30s — Short punch</option>
             <option value={60}>60s — Standard TikTok</option>
