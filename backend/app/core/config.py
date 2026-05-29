@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     KLING_API_BASE: str = "https://api.klingai.com"
     GROQ_API_KEY: str = ""
     PEXELS_API_KEY: str = ""
+    YOUTUBE_API_KEY: str = ""
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
     STRIPE_PRICE_ID: str = ""
