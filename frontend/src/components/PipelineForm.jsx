@@ -63,6 +63,8 @@ export default function PipelineForm({ onJobCreated }) {
             <option value={30}>30s — Short punch</option>
             <option value={60}>60s — Standard TikTok</option>
             <option value={90}>90s — Format long</option>
+            <option value={120}>2min — YouTube Short</option>
+            <option value={180}>3min — Format premium</option>
           </select>
         </div>
       </div>

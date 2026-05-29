@@ -3,7 +3,7 @@ import os
 import aiosqlite
 import aiofiles
 
-from app.services import script_service, tts_service, subtitle_service, assembler_service, background_service, music_service
+from app.services import script_service, tts_service, subtitle_service, assembler_service, background_service
 from app.core.config import settings
 
 _DB_PATH = os.path.normpath(
@@ -49,16 +49,14 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int):
     os.makedirs(_OUTPUTS_DIR, exist_ok=True)
 
     try:
-        # Étape 1 — Script
         await _update_job(job_id, status="generating_script")
         script = await script_service.generate_script(topic, duration, style)
         await _update_job(job_id, status="generating_audio", script=script)
 
-        # Étapes 2+3+4 — Audio TTS + Background + Musique en parallèle
-        audio_bytes, bg_video_path, music_path = await asyncio.gather(
+        # Audio TTS + Background Pexels en parallèle
+        audio_bytes, bg_video_path = await asyncio.gather(
             tts_service.generate_audio(script),
             _build_background(job_id, topic, duration),
-            music_service.fetch_music(style),
         )
 
         audio_path = os.path.join(_OUTPUTS_DIR, f"audio_{job_id}.mp3")
@@ -67,7 +65,6 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int):
 
         await _update_job(job_id, status="assembling_video")
 
-        # Étape 5 — Sous-titres
         from moviepy.editor import AudioFileClip
         audio_clip = AudioFileClip(audio_path)
         audio_duration = audio_clip.duration
@@ -75,7 +72,6 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int):
 
         chunks = subtitle_service.build_subtitles(script, audio_duration)
 
-        # Étape 6 — Assemblage vidéo
         video_filename = f"video_{job_id}.mp4"
         video_path = os.path.join(_OUTPUTS_DIR, video_filename)
 
@@ -86,8 +82,6 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int):
             chunks,
             video_path,
             bg_video_path,
-            music_path,
-            topic,
         )
 
         video_url = f"/pipeline/{video_filename}"
