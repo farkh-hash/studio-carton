@@ -66,20 +66,24 @@ async def _youtube_trending_shorts_fr() -> list[dict]:
 
 
 async def _google_trends_fr() -> list[str]:
-    """Récupère les tendances Google en France via pytrends."""
+    """Récupère les tendances Google en France via l'API publique."""
     try:
-        from pytrends.request import TrendReq
-        loop = asyncio.get_event_loop()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept-Language": "fr-FR,fr;q=0.9",
+        }
+        # Google Trends RSS feed France - pas besoin de pytrends
+        url = "https://trends.google.fr/trending/rss?geo=FR"
+        async with httpx.AsyncClient(timeout=10, headers=headers) as client:
+            resp = await client.get(url)
+            text = resp.text
 
-        def _fetch():
-            pt = TrendReq(hl="fr-FR", tz=60, timeout=(10, 30))
-            df = pt.trending_searches(pn="france")
-            return df[0].tolist()[:20] if not df.empty else []
-
-        return await asyncio.wait_for(
-            loop.run_in_executor(None, _fetch),
-            timeout=20
-        )
+        # Extraire les titres du RSS
+        titles = re.findall(r'<title><!\[CDATA\[(.*?)\]\]></title>', text)
+        if not titles:
+            titles = re.findall(r'<title>(.*?)</title>', text)
+        # Exclure le premier titre (nom du feed)
+        return [t for t in titles[1:21] if t and len(t) > 2]
     except Exception as e:
         print(f"[TRENDS] Google Trends erreur: {e}")
         return []
