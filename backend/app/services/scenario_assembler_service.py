@@ -1,13 +1,17 @@
 import os
 import tempfile
 import subprocess
-import aiofiles
-from PIL import Image, ImageDraw, ImageFont
 import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+from moviepy.editor import (
+    AudioFileClip, ImageClip, VideoFileClip,
+    CompositeVideoClip, ColorClip, concatenate_videoclips,
+    concatenate_audioclips
+)
 
 WIDTH, HEIGHT = 1080, 1920
 FPS = 30
-BG_COLOR = "0f0f19"
+BG_COLOR = (15, 15, 25)
 
 CHARACTER_COLORS = {
     "ALEX": (96, 165, 250),
@@ -26,53 +30,36 @@ def _load_font(size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default()
 
 
-def _make_combined_audio(segment_files: list[str], durations: list[float], output_path: str) -> bool:
-    """Concatene tous les audios en un seul fichier avec des silences entre."""
-    concat_list = tempfile.NamedTemporaryFile(suffix=".txt", delete=False, mode="w")
-    for i, (f, dur) in enumerate(zip(segment_files, durations)):
-        concat_list.write(f"file '{f}'\n")
-        # Ajouter 0.25s de silence entre les répliques
-        silence_path = f.replace(".mp3", "_silence.mp3")
-        subprocess.run([
-            "ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
-            "-t", "0.25", "-acodec", "libmp3lame", silence_path
-        ], capture_output=True)
-        concat_list.write(f"file '{silence_path}'\n")
-    concat_list.close()
-
-    cmd = [
-        "ffmpeg", "-y",
-        "-f", "concat", "-safe", "0", "-i", concat_list.name,
-        "-acodec", "libmp3lame", "-q:a", "2",
-        output_path
-    ]
-    result = subprocess.run(cmd, capture_output=True, timeout=60)
-    try:
-        os.remove(concat_list.name)
-    except Exception:
-        pass
-    return result.returncode == 0
+def _make_fallback_bg(duration: float) -> ImageClip:
+    img = Image.new("RGB", (WIDTH, HEIGHT), BG_COLOR)
+    draw = ImageDraw.Draw(img)
+    for y in range(HEIGHT):
+        ratio = y / HEIGHT
+        r = int(BG_COLOR[0] + (40 - BG_COLOR[0]) * ratio)
+        g = int(BG_COLOR[1] + (15 - BG_COLOR[1]) * ratio)
+        b = int(BG_COLOR[2] + (50 - BG_COLOR[2]) * ratio)
+        draw.line([(0, y), (WIDTH, y)], fill=(r, g, b))
+    return ImageClip(np.array(img), duration=duration)
 
 
-def _make_subtitle_image(character: str, line: str, emotion: str) -> str:
-    """Crée une image PNG pour les sous-titres d'un personnage."""
+def _make_dialogue_frame(character: str, line: str, emotion: str) -> np.ndarray:
+    """Frame simple avec nom du personnage + réplique."""
     img = Image.new("RGBA", (WIDTH, 380), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     color = CHARACTER_COLORS.get(character, (255, 255, 255))
-    font_name = _load_font(42)
-    font_line = _load_font(66)
+    font_name = _load_font(40)
+    font_line = _load_font(64)
 
     # Fond
     draw.rounded_rectangle([20, 5, WIDTH - 20, 375], radius=20, fill=(0, 0, 0, 210))
+    # Accent couleur
     draw.rounded_rectangle([20, 5, 34, 375], radius=10, fill=(*color, 255))
 
     # Nom
-    name_text = f"  {character}"
-    if emotion:
-        name_text += f"  •  {emotion}"
-    draw.text((50, 18), name_text, font=font_name, fill=(*color, 255))
+    name_text = f"  {character}" + (f"  •  {emotion}" if emotion else "")
+    draw.text((48, 16), name_text, font=font_name, fill=(*color, 255))
 
-    # Ligne avec wrap
+    # Texte avec wrap
     words = line.split()
     lines_out, buf = [], []
     for word in words:
@@ -86,20 +73,18 @@ def _make_subtitle_image(character: str, line: str, emotion: str) -> str:
     if buf:
         lines_out.append(" ".join(buf))
 
-    total_h = len(lines_out) * (66 + 8)
-    y = 68 + max(0, (280 - total_h) // 2)
+    total_h = len(lines_out) * (64 + 8)
+    y = 65 + max(0, (285 - total_h) // 2)
+
     for lt in lines_out:
         bbox = draw.textbbox((0, 0), lt, font=font_line)
         x = (WIDTH - (bbox[2] - bbox[0])) // 2
         for dx, dy in [(-2, -2), (-2, 2), (2, -2), (2, 2)]:
             draw.text((x + dx, y + dy), lt, font=font_line, fill=(0, 0, 0, 255))
         draw.text((x, y), lt, font=font_line, fill=(255, 255, 255, 255))
-        y += 66 + 8
+        y += 64 + 8
 
-    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-    tmp.close()
-    img.save(tmp.name)
-    return tmp.name
+    return np.array(img)
 
 
 def assemble_scenario(
@@ -110,22 +95,25 @@ def assemble_scenario(
     character_clips: dict = None,
 ) -> str:
     """
-    Assemble le scénario via ffmpeg pur — rapide et fiable.
-    Pas de MoviePy pour éviter les timeouts.
+    Assemblage simple et rapide :
+    - 1 audio combiné via ffmpeg concat
+    - 1 fond global
+    - Overlay texte par réplique (timing basé sur durée audio réelle)
     """
     if not segments:
         raise ValueError("Aucun segment audio")
 
-    # 1. Sauvegarder les audios
+    # Sauvegarder les audios et mesurer les durées
     segment_files = []
     durations = []
+    PAUSE = 0.25  # secondes entre répliques
+
     for i, seg in enumerate(segments):
         tmp = tempfile.NamedTemporaryFile(suffix=f"_seg{i}.mp3", delete=False)
         tmp.write(seg["audio_bytes"])
         tmp.close()
         segment_files.append(tmp.name)
 
-        # Mesurer la durée avec ffprobe
         try:
             r = subprocess.run([
                 "ffprobe", "-v", "quiet", "-show_entries", "format=duration",
@@ -133,107 +121,105 @@ def assemble_scenario(
             ], capture_output=True, text=True, timeout=10)
             dur = float(r.stdout.strip() or "3.0")
         except Exception:
-            dur = len(seg.get("line", "").split()) / 2.5
+            dur = max(1.5, len(seg.get("line", "").split()) / 2.5)
         durations.append(dur)
 
-    total_duration = sum(durations) + len(durations) * 0.25
+    # Concatener les audios avec ffmpeg (rapide et fiable)
+    concat_file = tempfile.NamedTemporaryFile(suffix=".txt", delete=False, mode="w")
+    silence_files = []
+    for f in segment_files:
+        concat_file.write(f"file '{f}'\n")
+        # Silence de 0.25s
+        sil = f.replace(".mp3", "_sil.mp3")
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "lavfi", "-i",
+            "anullsrc=r=44100:cl=stereo",
+            "-t", str(PAUSE), "-acodec", "libmp3lame",
+            "-loglevel", "quiet", sil
+        ], capture_output=True, timeout=15)
+        concat_file.write(f"file '{sil}'\n")
+        silence_files.append(sil)
+    concat_file.close()
 
-    # 2. Concatener tous les audios
-    combined_audio = output_path.replace(".mp4", "_audio.mp3")
-    if not _make_combined_audio(segment_files, durations, combined_audio):
-        raise RuntimeError("Erreur concatenation audio")
+    combined_audio = output_path.replace(".mp4", "_combined.mp3")
+    subprocess.run([
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+        "-i", concat_file.name, "-acodec", "libmp3lame",
+        "-loglevel", "quiet", combined_audio
+    ], capture_output=True, timeout=60)
+    os.remove(concat_file.name)
 
-    # 3. Créer le fond
+    # Charger l'audio final et obtenir la durée réelle
+    audio_clip = AudioFileClip(combined_audio)
+    total_duration = audio_clip.duration
+
+    # Fond global
     if bg_video_path and os.path.exists(bg_video_path):
-        # Boucler le fond pour couvrir la durée
-        bg_final = output_path.replace(".mp4", "_bg.mp4")
-        subprocess.run([
-            "ffmpeg", "-y",
-            "-stream_loop", "-1", "-i", bg_video_path,
-            "-t", str(total_duration + 1),
-            "-vf", f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT},colorlevels=rimin=0:rimax=0.7:gimin=0:gimax=0.7:bimin=0:bimax=0.7",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "28", "-an",
-            bg_final
-        ], capture_output=True, timeout=120)
+        try:
+            c = VideoFileClip(bg_video_path, audio=False)
+            if c.duration < total_duration:
+                loops = int(total_duration / c.duration) + 1
+                bg = concatenate_videoclips([c] * loops).subclip(0, total_duration)
+            else:
+                bg = c.subclip(0, total_duration)
+        except Exception:
+            bg = _make_fallback_bg(total_duration)
     else:
-        bg_final = output_path.replace(".mp4", "_bg.mp4")
-        subprocess.run([
-            "ffmpeg", "-y",
-            "-f", "lavfi", "-i", f"color=c=#{BG_COLOR}:size={WIDTH}x{HEIGHT}:rate={FPS}",
-            "-t", str(total_duration + 1),
-            "-c:v", "libx264", "-preset", "fast",
-            bg_final
-        ], capture_output=True, timeout=30)
+        bg = _make_fallback_bg(total_duration)
 
-    # 4. Construire les filtres de sous-titres avec ffmpeg drawtext
-    # Créer des images PNG pour chaque réplique et les superposer
-    subtitle_images = []
+    # Overlay sombre
+    overlay = ColorClip(size=(WIDTH, HEIGHT), color=(0, 0, 0), duration=total_duration).set_opacity(0.30)
+
+    # Clips dialogue avec timing calculé
+    dialogue_clips = []
     t = 0.0
-    overlay_filters = []
-    inputs = ["-i", bg_final, "-i", combined_audio]
+    for seg, dur in zip(segments, durations):
+        line = seg.get("line", "").strip()
+        if not line:
+            t += dur + PAUSE
+            continue
 
-    for i, (seg, dur) in enumerate(zip(segments, durations)):
-        img_path = _make_subtitle_image(
+        frame = _make_dialogue_frame(
             seg.get("character", "ALEX"),
-            seg.get("line", ""),
+            line,
             seg.get("emotion", "")
         )
-        subtitle_images.append(img_path)
-        inputs.extend(["-i", img_path])
-        t_end = t + dur
-        overlay_filters.append((i + 2, t, t_end))
-        t += dur + 0.25
-
-    # Construire le filter_complex
-    filter_parts = ["[0:v]colorlevels=rimin=0:rimax=1[bg]"]
-    prev = "bg"
-    for idx, (inp_idx, t_start, t_end) in enumerate(overlay_filters):
-        out_label = f"v{idx}"
-        y_pos = HEIGHT - 400
-        filter_parts.append(
-            f"[{prev}][{inp_idx}:v]overlay=x=(W-w)/2:y={y_pos}:enable='between(t,{t_start:.3f},{t_end:.3f})'[{out_label}]"
+        d_clip = (
+            ImageClip(frame, ismask=False)
+            .set_start(t)
+            .set_duration(dur)
+            .set_position(("center", HEIGHT - 410))
+            .fadein(0.1)
+            .fadeout(0.1)
         )
-        prev = out_label
+        dialogue_clips.append(d_clip)
+        t += dur + PAUSE
 
-    filter_complex = ";".join(filter_parts)
+    # Composition finale légère
+    video = CompositeVideoClip(
+        [bg, overlay] + dialogue_clips,
+        size=(WIDTH, HEIGHT)
+    ).set_audio(audio_clip)
 
-    # 5. Assembler avec ffmpeg
-    cmd = (
-        ["ffmpeg", "-y"]
-        + inputs
-        + [
-            "-filter_complex", filter_complex,
-            "-map", f"[{prev}]",
-            "-map", "1:a",
-            "-t", str(total_duration),
-            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-            "-c:a", "aac", "-b:a", "128k",
-            output_path
-        ]
+    video.write_videofile(
+        output_path,
+        fps=FPS,
+        codec="libx264",
+        audio_codec="aac",
+        temp_audiofile=output_path + ".tmp.m4a",
+        remove_temp=True,
+        logger=None,
+        threads=2,
     )
 
-    result = subprocess.run(cmd, capture_output=True, timeout=300)
+    audio_clip.close()
+    video.close()
 
     # Nettoyage
-    for f in segment_files + subtitle_images:
+    for f in segment_files + silence_files + [combined_audio]:
         try:
             os.remove(f)
         except Exception:
             pass
-    for f in [combined_audio, bg_final]:
-        try:
-            os.remove(f)
-        except Exception:
-            pass
-    # Silences
-    for f in segment_files:
-        silence = f.replace(".mp3", "_silence.mp3")
-        try:
-            os.remove(silence)
-        except Exception:
-            pass
-
-    if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg error: {result.stderr.decode()[-500:]}")
 
     return output_path
