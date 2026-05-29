@@ -2,40 +2,38 @@ import asyncio
 import os
 import re
 import unicodedata
-import aiosqlite
-import aiofiles
-
-from app.services import script_service, tts_service, subtitle_service, assembler_service, background_service
-from app.core.config import settings
-
-_DATA_DIR = "/data" if os.path.exists("/data") else os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "../../data_local")
-)
-_DB_PATH = os.path.join(_DATA_DIR, "studio_carton.db")
-_OUTPUTS_DIR = os.environ.get("PIPELINE_DIR") or os.path.join(_DATA_DIR, "outputs/pipeline")
 
 
 def _clean_script(script: str) -> str:
-    """Nettoie le script : encodage + mise en forme."""
     script = unicodedata.normalize("NFC", script)
-    # Fix artefacts encodage courants
     replacements = [
         ("â¬", "euros"), ("â€™", "'"), ("â€œ", '"'), ("â€", '"'),
         ("Ã©", "é"), ("Ã ", "à"), ("Ã¨", "è"), ("Ã§", "ç"),
         ("Ã¢", "â"), ("Ãª", "ê"), ("Ã®", "î"), ("Ã´", "ô"),
-        ("Ã»", "û"), ("Ã¹", "ù"), ("Ã«", "ë"), ("Ã¯", "ï"),
+        ("Ã»", "û"), ("Ã¹", "ù"),
     ]
     for bad, good in replacements:
         script = script.replace(bad, good)
-    # Nettoyer lignes et espaces
     script = re.sub(r'\n{3,}', '\n\n', script)
     script = re.sub(r'[ \t]+', ' ', script)
     script = '\n'.join(line.strip() for line in script.split('\n') if line.strip())
     return script
 
 
+def _get_paths():
+    data_dir = "/data" if os.path.exists("/data") else os.path.normpath(
+        os.path.join(os.path.dirname(__file__), "../../data_local")
+    )
+    return (
+        os.path.join(data_dir, "studio_carton.db"),
+        os.environ.get("PIPELINE_DIR") or os.path.join(data_dir, "outputs/pipeline"),
+    )
+
+
 async def _update_job(job_id: int, **kwargs):
-    async with aiosqlite.connect(_DB_PATH) as db:
+    import aiosqlite
+    db_path, _ = _get_paths()
+    async with aiosqlite.connect(db_path) as db:
         fields = ", ".join(f"{k}=?" for k in kwargs)
         values = list(kwargs.values()) + [job_id]
         await db.execute(
@@ -46,14 +44,18 @@ async def _update_job(job_id: int, **kwargs):
 
 
 async def _build_background(job_id: int, topic: str, duration: int) -> str | None:
+    from app.services.background_service import fetch_background_clips, build_background_video
+    from app.core.config import settings
+    _, outputs_dir = _get_paths()
+
     if not settings.PEXELS_API_KEY:
         return None
     try:
-        clip_paths = await background_service.fetch_background_clips(topic, duration)
+        clip_paths = await fetch_background_clips(topic, duration)
         if not clip_paths:
             return None
-        bg_path = os.path.join(_OUTPUTS_DIR, f"bg_{job_id}.mp4")
-        ok = background_service.build_background_video(clip_paths, duration + 5, bg_path)
+        bg_path = os.path.join(outputs_dir, f"bg_{job_id}.mp4")
+        ok = build_background_video(clip_paths, duration + 5, bg_path)
         for p in clip_paths:
             try:
                 os.remove(p)
@@ -66,7 +68,12 @@ async def _build_background(job_id: int, topic: str, duration: int) -> str | Non
 
 
 async def run_pipeline(job_id: int, topic: str, style: str, duration: int, script_override: str = None, hook_type: str = "auto"):
-    os.makedirs(_OUTPUTS_DIR, exist_ok=True)
+    import aiosqlite
+    import aiofiles
+    from app.services import script_service, tts_service, subtitle_service, assembler_service
+
+    _, outputs_dir = _get_paths()
+    os.makedirs(outputs_dir, exist_ok=True)
 
     try:
         await _update_job(job_id, status="generating_script")
@@ -77,7 +84,6 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
             script = await script_service.generate_script(topic, duration, style, hook_type)
             script = _clean_script(script)
 
-            # Validation longueur — au moins 1.8 mots par seconde (parole naturelle)
             word_count = len(script.split())
             min_words = max(80, int(duration * 1.8))
             if word_count < min_words:
@@ -85,16 +91,16 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
                 script = await script_service.generate_script(topic, duration, style, hook_type)
                 script = _clean_script(script)
 
-        # Agent 4 — Validation du script
+        # Agent 4 — Validation
         if not script_override:
             try:
                 from app.services.script_validator_service import validate_script
-                validation = validate_script(script, topic, duration)
+                loop = asyncio.get_event_loop()
+                validation = await loop.run_in_executor(None, validate_script, script, topic, duration)
                 score = validation.get("scores", {}).get("overall", 5)
-                print(f"[PIPELINE] Validation score: {score}/10 | Mots: {validation.get('word_count', 0)}")
-
+                print(f"[PIPELINE] Validation: {score}/10 | {len(script.split())} mots")
                 if validation.get("regenerate") or score < 6:
-                    print(f"[PIPELINE] Score insuffisant ({score}/10), régénération...")
+                    print(f"[PIPELINE] Score insuffisant, régénération...")
                     script = await script_service.generate_script(topic, duration, style, hook_type)
                     script = _clean_script(script)
             except Exception as e:
@@ -103,34 +109,31 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
         print(f"[PIPELINE] Script final: {len(script.split())} mots")
         await _update_job(job_id, status="generating_audio", script=script)
 
-        # Audio TTS + Background en parallèle
         (audio_bytes, word_boundaries), bg_video_path = await asyncio.gather(
             tts_service.generate_audio(script),
             _build_background(job_id, topic, duration),
         )
 
-        audio_path = os.path.join(_OUTPUTS_DIR, f"audio_{job_id}.mp3")
+        audio_path = os.path.join(outputs_dir, f"audio_{job_id}.mp3")
         async with aiofiles.open(audio_path, "wb") as f:
             await f.write(audio_bytes)
 
         await _update_job(job_id, status="assembling_video")
 
-        # Sous-titres synchronisés si timestamps disponibles
         if word_boundaries:
             chunks = subtitle_service.build_subtitles_from_words(word_boundaries, words_per_chunk=3)
-            print(f"[PIPELINE] Sous-titres sync: {len(chunks)} chunks")
         else:
             from moviepy.editor import AudioFileClip
             audio_clip = AudioFileClip(audio_path)
             audio_duration = audio_clip.duration
             audio_clip.close()
             chunks = subtitle_service.build_subtitles(script, audio_duration)
-            print(f"[PIPELINE] Sous-titres fallback: {len(chunks)} chunks")
 
         video_filename = f"video_{job_id}.mp4"
-        video_path = os.path.join(_OUTPUTS_DIR, video_filename)
+        video_path = os.path.join(outputs_dir, video_filename)
 
-        await asyncio.get_event_loop().run_in_executor(
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
             None,
             assembler_service.assemble_video,
             audio_path,
@@ -139,8 +142,7 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
             bg_video_path,
         )
 
-        video_url = f"/pipeline/{video_filename}"
-        await _update_job(job_id, status="completed", video_url=video_url)
+        await _update_job(job_id, status="completed", video_url=f"/pipeline/{video_filename}")
 
     except Exception as e:
         await _update_job(job_id, status="failed", error_msg=str(e)[:500])
