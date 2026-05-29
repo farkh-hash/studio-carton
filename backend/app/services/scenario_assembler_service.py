@@ -26,14 +26,15 @@ def _get_font() -> str:
 
 
 def _escape_text(text: str) -> str:
-    """Escape texte pour ffmpeg drawtext."""
-    text = text.replace("\\", "\\\\")
-    text = text.replace("'", "\\'")
-    text = text.replace(":", "\\:")
-    text = text.replace("%", "\\%")
-    text = text.replace("[", "\\[")
-    text = text.replace("]", "\\]")
-    return text
+    """Simplifie le texte pour ffmpeg drawtext — supprime les caractères problématiques."""
+    import unicodedata
+    # Normaliser les accents
+    text = unicodedata.normalize("NFC", text)
+    # Remplacer apostrophes typographiques
+    text = text.replace("’", " ").replace("‘", " ").replace("'", " ")
+    text = text.replace('"', ' ').replace(':', ' ').replace('%', ' ')
+    text = text.replace('[', '').replace(']', '').replace('\\', '')
+    return text.strip()
 
 
 def _wrap_text(text: str, max_chars: int = 28) -> list[str]:
