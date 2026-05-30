@@ -1,4 +1,4 @@
-﻿import httpx
+import httpx
 import asyncio
 import json
 from app.core.config import settings
@@ -90,7 +90,8 @@ async def analyze_competitors(topic: str) -> dict:
         return {}
 
     # Analyse Groq des patterns des concurrents
-        context = json.dumps(competitor_data, ensure_ascii=False, indent=2)
+    from app.services.groq_client import chat as groq_chat
+    context = json.dumps(competitor_data, ensure_ascii=False, indent=2)
 
     prompt = f"""Analyse ces chaînes concurrentes qui cartonnent sur le sujet "{topic}".
 
@@ -114,9 +115,7 @@ Identifie leurs patterns de succès communs et retourne un JSON :
 
 JSON uniquement."""
 
-    raw_content = groq_chat(messages=[{"role": "user", "content": prompt}], max_tokens=700, temperature=0.5)
-
-    raw = raw_resp
+    raw = groq_chat(messages=[{"role": "user", "content": prompt}], max_tokens=700, temperature=0.5)
     if "```" in raw:
         raw = raw.split("```")[1]
         if raw.startswith("json"):

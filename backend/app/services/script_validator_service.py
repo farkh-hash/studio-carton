@@ -1,4 +1,4 @@
-﻿from app.core.config import settings
+from app.core.config import settings
 import json
 import re
 
@@ -8,7 +8,9 @@ def validate_script(script: str, topic: str, duration: int) -> dict:
     Valide un script sur plusieurs critères.
     Retourne un score global et des recommandations.
     """
-        word_count = len(script.split())
+    from app.services.groq_client import chat as groq_chat
+
+    word_count = len(script.split())
     target_words = int(duration * 2.2)  # ~2.2 mots/seconde en français naturel
     sentence_count = len([s for s in re.split(r'[.!?]', script) if s.strip()])
     avg_words_per_sentence = word_count / max(sentence_count, 1)
@@ -60,9 +62,7 @@ Si overall < 6 OU false_claims non vide → met regenerate: true
 
 JSON uniquement."""
 
-    raw_content = groq_chat(messages=[{"role": "user", "content": prompt}], max_tokens=800, temperature=0.3)
-
-    raw = raw_resp
+    raw = groq_chat(messages=[{"role": "user", "content": prompt}], max_tokens=800, temperature=0.3)
     if "```" in raw:
         raw = raw.split("```")[1]
         if raw.startswith("json"):
