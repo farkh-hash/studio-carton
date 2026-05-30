@@ -24,12 +24,14 @@ def _get_font() -> str:
 def _escape_ffmpeg(text: str) -> str:
     text = unicodedata.normalize("NFC", text)
     text = text.replace("'", " ").replace("’", " ").replace("‘", " ")
-    text = text.replace('"', " ").replace(":", " ").replace("%", "pct")
+    text = text.replace('"', " ").replace(":", " ").replace("%", " pourcent")
     text = text.replace("[", "").replace("]", "").replace("\\", "").replace("/", " ")
-    return text.strip()
+    text = text.replace("€", " euros").replace("$", " dollars")
+    # ALL CAPS — style viral TikTok
+    return text.upper().strip()
 
 
-def _wrap_text(text: str, max_chars: int = 20) -> list[str]:
+def _wrap_text(text: str, max_chars: int = 16) -> list[str]:
     words = text.split()
     lines, line = [], []
     for word in words:
@@ -41,7 +43,7 @@ def _wrap_text(text: str, max_chars: int = 20) -> list[str]:
             line.append(word)
     if line:
         lines.append(" ".join(line))
-    return lines[:3]
+    return lines[:2]
 
 
 def _get_audio_duration(audio_path: str) -> float:
@@ -60,39 +62,35 @@ def _build_subtitle_filters(chunks: List[SubtitleChunk], font: str) -> str:
         return ""
 
     filters = []
-    FONT_SIZE = 90
-    LINE_H = 108
+    FONT_SIZE = 112
+    LINE_H = 130
+    # Position dans le tiers inférieur — lisible sans gêner le visage
+    BASE_Y = HEIGHT - 520
 
     for chunk in chunks:
         t_start = chunk.start
         t_end = chunk.end
         enable = f"'gte(t\\,{t_start:.3f})*lte(t\\,{t_end:.3f})'"
 
-        lines = _wrap_text(chunk.text, max_chars=24)
-        base_y = HEIGHT - 480
+        lines = _wrap_text(chunk.text, max_chars=16)
 
         for i, line_text in enumerate(lines):
             escaped = _escape_ffmpeg(line_text)
             if not escaped:
                 continue
-            y = base_y + i * LINE_H
+            y = BASE_Y + i * LINE_H
 
-            # Fond semi-transparent derrière le texte pour lisibilité maximale
-            filters.append(
-                f"drawtext=fontfile='{font}':text='{escaped}':fontsize={FONT_SIZE}:"
-                f"fontcolor=white@0.0:x=(w-tw)/2:y={y}:"
-                f"box=1:boxcolor=black@0.55:boxborderw=18:enable={enable}"
-            )
-            # Contour sombre (4 passes)
-            for dx, dy in [(-3, -3), (-3, 3), (3, -3), (3, 3)]:
+            # Contour épais — 8 passes pour un rendu solide sur n'importe quel fond
+            for dx, dy in [(-5, -5), (-5, 0), (-5, 5), (0, -5),
+                           (0, 5), (5, -5), (5, 0), (5, 5)]:
                 filters.append(
                     f"drawtext=fontfile='{font}':text='{escaped}':fontsize={FONT_SIZE}:"
-                    f"fontcolor=black@0.9:x=(w-tw)/2+{dx}:y={y+dy}:enable={enable}"
+                    f"fontcolor=black:x=(w-tw)/2+{dx}:y={y+dy}:enable={enable}"
                 )
-            # Texte jaune vif — couleur signature TikTok
+            # Texte blanc principal — net et lisible
             filters.append(
                 f"drawtext=fontfile='{font}':text='{escaped}':fontsize={FONT_SIZE}:"
-                f"fontcolor=0xFFE600:x=(w-tw)/2:y={y}:enable={enable}"
+                f"fontcolor=white:x=(w-tw)/2:y={y}:enable={enable}"
             )
 
     return ",".join(filters)
@@ -107,7 +105,7 @@ def assemble_video(
     font = _get_font()
     duration = _get_audio_duration(audio_path)
 
-    # 1. Normaliser l'audio — loudnorm -14 LUFS (standard TikTok/YouTube), 192kbps AAC
+    # 1. Normaliser l'audio — loudnorm -14 LUFS standard TikTok/YouTube, 192kbps
     audio_norm = output_path.replace(".mp4", "_norm.aac")
     subprocess.run([
         "ffmpeg", "-y", "-i", audio_path,
@@ -117,33 +115,42 @@ def assemble_video(
     ], capture_output=True, timeout=60)
     audio_to_use = audio_norm if os.path.exists(audio_norm) else audio_path
 
-    # 2. Préparer le fond vidéo — CRF 20, luminosité 80% (lisible sans être sombre)
+    # 2. Fond vidéo avec zoom lent (effet cinématique) + assombrissement doux
     bg_tmp = output_path.replace(".mp4", "_bg.mp4")
     if bg_video_path and os.path.exists(bg_video_path):
+        fps_dur = int(duration * FPS) + 10
         subprocess.run([
             "ffmpeg", "-y", "-stream_loop", "-1", "-i", bg_video_path,
-            "-t", str(duration + 0.5),
+            "-t", str(duration + 1),
             "-vf", (
-                f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,"
-                f"crop={WIDTH}:{HEIGHT},"
-                "colorlevels=rimin=0:rimax=0.80:gimin=0:gimax=0.80:bimin=0:bimax=0.80"
+                # Scale légèrement plus grand pour permettre le zoom
+                f"scale=1200:2133:force_original_aspect_ratio=increase,"
+                f"crop=1200:2133,"
+                # Zoom lent Ken Burns — transforme n'importe quel clip en cinéma
+                f"zoompan=z='min(zoom+0.0008\\,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+                f":d={fps_dur}:s={WIDTH}x{HEIGHT}:fps={FPS},"
+                # Assombrissement doux pour lisibilité sous-titres
+                "colorlevels=rimin=0:rimax=0.78:gimin=0:gimax=0.78:bimin=0:bimax=0.78,"
+                # Vignette sombre sur les bords — look cinématique
+                "vignette=PI/5"
             ),
             "-c:v", "libx264", "-preset", "fast", "-crf", "20", "-an",
             "-loglevel", "quiet", bg_tmp
-        ], capture_output=True, timeout=120)
+        ], capture_output=True, timeout=180)
     else:
+        # Fond dégradé sombre (fallback propre)
         subprocess.run([
             "ffmpeg", "-y", "-f", "lavfi",
-            "-i", f"color=c=0x080814:size={WIDTH}x{HEIGHT}:rate={FPS}",
-            "-t", str(duration + 0.5),
+            "-i", f"color=c=0x050510:size={WIDTH}x{HEIGHT}:rate={FPS}",
+            "-t", str(duration + 1),
             "-c:v", "libx264", "-preset", "fast", "-loglevel", "quiet", bg_tmp
         ], capture_output=True, timeout=30)
 
-    # 3. Filtres sous-titres drawtext
+    # 3. Filtres sous-titres ALL CAPS avec contour épais
     vf = _build_subtitle_filters(chunks, font)
     vf = vf if vf else "null"
 
-    # 4. Assemblage final — CRF 18 = haute qualité, +faststart pour streaming web
+    # 4. Assemblage final — CRF 18 haute qualité, faststart pour web
     cmd = [
         "ffmpeg", "-y",
         "-i", bg_tmp,

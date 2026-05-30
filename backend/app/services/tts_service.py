@@ -12,8 +12,80 @@ VOICES = [
 EDGE_TTS_TIMEOUT = 25  # secondes max par voix
 
 
+_UNITS = ["", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf",
+          "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize", "dix-sept",
+          "dix-huit", "dix-neuf"]
+_TENS = ["", "", "vingt", "trente", "quarante", "cinquante", "soixante",
+         "soixante", "quatre-vingt", "quatre-vingt"]
+
+
+def _int_to_fr(n: int) -> str:
+    if n < 0:
+        return "moins " + _int_to_fr(-n)
+    if n == 0:
+        return "zéro"
+    if n < 20:
+        return _UNITS[n]
+    if n < 70:
+        t, u = divmod(n, 10)
+        return _TENS[t] + ("-" + _UNITS[u] if u else "")
+    if n < 80:
+        return "soixante-" + _int_to_fr(n - 60)
+    if n < 100:
+        u = n - 80
+        return "quatre-vingt" + ("-" + _int_to_fr(u) if u else "s")
+    if n < 1000:
+        h, r = divmod(n, 100)
+        return (_int_to_fr(h) + " cent" + ("s" if r == 0 and h > 1 else "") +
+                (" " + _int_to_fr(r) if r else ""))
+    if n < 1_000_000:
+        m, r = divmod(n, 1000)
+        return ((_int_to_fr(m) + " mille" if m > 1 else "mille") +
+                (" " + _int_to_fr(r) if r else ""))
+    return str(n)
+
+
+def _preprocess_for_tts(text: str) -> str:
+    """Convertit les chiffres, symboles et abréviations pour une lecture TTS naturelle."""
+    # Pourcentages : "73%" → "soixante-treize pourcent"
+    def replace_pct(m):
+        try:
+            return _int_to_fr(int(m.group(1))) + " pourcent"
+        except Exception:
+            return m.group(0)
+    text = re.sub(r'(\d+)\s*%', replace_pct, text)
+
+    # Euros : "500€" ou "500 €" → "cinq cents euros"
+    def replace_eur(m):
+        try:
+            return _int_to_fr(int(m.group(1))) + " euros"
+        except Exception:
+            return m.group(0)
+    text = re.sub(r'(\d+)\s*€', replace_eur, text)
+
+    # Nombres isolés : "73" → "soixante-treize"
+    def replace_num(m):
+        try:
+            n = int(m.group(0))
+            if n > 10_000:
+                return m.group(0)
+            return _int_to_fr(n)
+        except Exception:
+            return m.group(0)
+    text = re.sub(r'\b(\d+)\b', replace_num, text)
+
+    # Abréviations courantes
+    text = re.sub(r'\bvs\b', 'versus', text, flags=re.IGNORECASE)
+    text = re.sub(r'\betc\b\.?', 'et cetera', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bmax\b', 'maximum', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bmin\b', 'minimum', text, flags=re.IGNORECASE)
+
+    return text
+
+
 def _clean_text(text: str) -> str:
-    text = re.sub(r'[^\w\s\.,;:!?\'\"\-\(\)àâäéèêëîïôöùûüçÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ]', ' ', text)
+    text = _preprocess_for_tts(text)
+    text = re.sub(r'[^\w\s\.,;:!?\'\-àâäéèêëîïôöùûüçÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ]', ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
     return text[:4500] if len(text) > 4500 else text
 

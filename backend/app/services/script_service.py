@@ -11,27 +11,26 @@ STYLE_INSTRUCTIONS = {
     "humour": "Ton décalé et fun. Situation absurde, autodérision. Informer en faisant sourire.",
 }
 
-SYSTEM_PROMPT = """Tu es le meilleur scénariste de contenus courts viraux francophones.
-Tu génères des scripts qui se lisent à voix haute de façon naturelle, avec un rythme haché et addictif.
+SYSTEM_PROMPT = """Tu es le ghostwriter des créateurs TikTok francophones qui font des millions de vues.
+Tes scripts arrêtent le scroll en moins de deux secondes. Chaque mot est calculé.
 
-RÈGLES DE RYTHME ABSOLUES :
-- Phrases de 5 à 9 mots maximum — jamais plus
-- Pas de virgules : remplace par des points
-- Chaque phrase = une idée unique
-- Alterne les longueurs : court. Puis un peu plus long. Puis très court.
-- Jamais de bullet points, listes, tirets, numéros
-- Jamais de guillemets, parenthèses, astérisques
+FORMAT OBLIGATOIRE :
+- Phrases de 4 à 7 mots. Un point après chaque phrase.
+- Pas de virgule. Jamais. Que des points.
+- Jamais de tirets, listes, guillemets, parenthèses, astérisques.
+- Jamais de "Voici", "Découvrez", "Dans cette vidéo", "Aujourd'hui".
+- Chiffres TOUJOURS en lettres : "soixante-treize pourcent" pas "73%", "cinq cents euros" pas "500€".
 
-STRUCTURE QUI RETIENT L'ATTENTION :
-- Hook (2-4s) : choc immédiat, question ou affirmation surprenante
-- Développement : boucles ouvertes ("mais voilà le truc...", "et ce n'est pas tout...")
-- Chiffres précis uniquement : "73%" pas "beaucoup", "8 minutes" pas "quelques minutes"
-- CTA naturel en fin : question ou appel à l'action conversationnel
+TECHNIQUE NARRATIVE :
+- Phrase 1 (hook) : fait choc ou question impossible à ignorer.
+- Phrases 2-4 : creuser le problème. Rendre la douleur réelle.
+- Milieu : révélation progressive. Chaque phrase ouvre une question.
+- Fin : CTA naturel. Une question à laquelle tout le monde veut répondre.
 
-EXEMPLE DE BON RYTHME :
-"Personne ne te dit ça. Pourtant c'est la règle numéro un. Quatre-vingt-dix pourcent des gens la violent chaque jour. Et ça leur coûte des heures. Parfois des années. Voici ce que les meilleurs font différemment."
+SCRIPT PARFAIT exemple (finance, 60s) :
+Tu perds de l'argent sans le savoir. Chaque mois. Automatiquement. Quatre-vingt-trois pourcent des Français ont ce problème. Et personne ne leur dit. Quand tu laisses ton argent sur un compte courant. Il perd de la valeur. Deux virgule cinq pourcent par an. C'est l'inflation. En dix ans. Tu as perdu vingt pourcent. Sans rien faire. Les gens qui s'enrichissent font l'inverse. Ils placent. Même cinquante euros par mois. Ça change tout. En vingt ans c'est cent vingt mille euros. Pas de chance. Juste une habitude. Est-ce que tu places déjà tes économies.
 
-Génère UNIQUEMENT le texte à lire. Aucun titre, aucune annotation, aucun commentaire."""
+Génère UNIQUEMENT le texte à lire. Rien d'autre."""
 
 
 async def _run_all_research(topic: str, style: str) -> dict:
@@ -229,29 +228,26 @@ async def generate_script(topic: str, duration: int = 60, style: str = "viral", 
 
     client = Groq(api_key=settings.GROQ_API_KEY)
 
-    hook_instruction = f'Utilise ce hook prouvé : "{best_hook}"' if best_hook else "Utilise les patterns prouvés ci-dessus pour créer un hook ultra-fort"
+    hook_instruction = f'Commence EXACTEMENT par : "{best_hook}"' if best_hook else "Invente un hook choc en 5 mots maximum — fait surprenant ou question impossible à ignorer"
 
-    prompt = f"""Écris un script de {duration} secondes environ {target_words} mots pour une vidéo virale sur :
-
-SUJET : {topic}
+    prompt = f"""SUJET : {topic}
 STYLE : {style_note}
+DURÉE : {duration} secondes — environ {target_words} mots
 
 {mega_context}
 
-HOOK à utiliser : {hook_instruction}
+HOOK : {hook_instruction}
 
-CONSIGNES STRICTES :
-- Commence DIRECTEMENT par le hook, sans introduction
-- Phrases courtes : 5 à 9 mots maximum chacune
-- Pas de ponctuation complexe — uniquement des points et points d'exclamation
-- Langage oral : comme si tu parlais à un ami
-- Chiffres réels et vérifiables uniquement
-- Enchaine les révélations pour forcer à regarder jusqu'à la fin
-- Termine par une question ou un appel à l'action naturel
+RÈGLES ABSOLUES :
+1. Commence par le hook. Rien avant.
+2. Phrases de 4 à 7 mots. Un point après chaque phrase.
+3. Chiffres en lettres : "soixante-quinze pourcent" jamais "75%".
+4. Zéro virgule. Zéro liste. Zéro "Voici" ou "Découvrez".
+5. Chaque phrase rend la suivante impossible à ne pas écouter.
+6. Fin : une question courte et engageante.
+7. LONGUEUR STRICTE : entre {target_words - 10} et {target_words + 10} mots.
 
-LONGUEUR : exactement entre {target_words - 15} et {target_words + 15} mots.
-
-Script :"""
+Écris le script maintenant :"""
 
     def _call_groq():
         return client.chat.completions.create(
