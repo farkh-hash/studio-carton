@@ -63,60 +63,19 @@ async def _run_scenario_pipeline(job_id: int, topic: str, duration: int, scenari
         plain_script = scenario_to_plain_script(scenario)
         await _update(status="generating_audio", script=plain_script)
 
-        async def get_character_clips():
-            """Télécharge des clips pour chaque personnage."""
-            if not settings.PEXELS_API_KEY:
-                return {}
-            from app.services.background_service import fetch_character_clips as fetch_char, fetch_background_clips, build_background_video
-            from app.services.scenario_script_service import CHARACTERS
-            clips = {}
-            # Extraire des mots-clés du topic pour contextualiser les clips
-            topic_kw = topic.split()[:3]
-            topic_str = " ".join(topic_kw)
-            for char in CHARACTERS:
-                try:
-                    clip_path = await asyncio.wait_for(
-                        fetch_char(char, topic_str),
-                        timeout=30
-                    )
-                    if clip_path:
-                        clips[char] = clip_path
-                        print(f"[SCENARIO] Clip {char}: OK")
-                except Exception as e:
-                    print(f"[SCENARIO] Clip {char} error: {e}")
-            return clips
-
-        async def get_bg_video():
-            """Télécharge le fond vidéo Pexels pour le scénario."""
-            if not settings.PEXELS_API_KEY:
-                return None
-            try:
-                clips = await fetch_background_clips(topic, duration)
-                if not clips:
-                    return None
-                bg_path = os.path.join(outputs_dir, f"bg_{job_id}.mp4")
-                ok = build_background_video(clips, duration + 5, bg_path)
-                for p in clips:
-                    try:
-                        os.remove(p)
-                    except Exception:
-                        pass
-                return bg_path if ok else None
-            except Exception as e:
-                print(f"[SCENARIO] BG error: {e}")
-                return None
-
-        audio_segments, character_clips, bg_video_path = await asyncio.gather(
-            generate_scenario_audio(scenario),
-            get_character_clips(),
-            get_bg_video(),
-        )
+        # Fond animé généré par ffmpeg — plus professionnel que Pexels
+        audio_segments = await generate_scenario_audio(scenario)
+        character_clips = {}
+        bg_video_path = None
 
         await _update(status="assembling_video")
         video_filename = f"video_{job_id}.mp4"
         video_path = os.path.join(outputs_dir, video_filename)
 
-        await loop.run_in_executor(None, assemble_scenario, audio_segments, video_path, bg_video_path, None, character_clips)
+        await loop.run_in_executor(
+            None,
+            lambda: assemble_scenario(audio_segments, video_path, bg_video_path, None, character_clips, topic)
+        )
         await _update(status="completed", video_url=f"/pipeline/{video_filename}")
 
     except Exception as e:

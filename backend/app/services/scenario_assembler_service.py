@@ -158,6 +158,7 @@ def assemble_scenario(
     bg_video_path: str = None,
     music_path: str = None,
     character_clips: dict = None,
+    topic: str = "",
 ) -> str:
     """
     100% ffmpeg — rapide, fiable, pas de MoviePy.
@@ -187,24 +188,10 @@ def assemble_scenario(
     combined_audio, total_duration = _concat_audios(segment_files, durations)
 
     # 3. Créer le fond vidéo
+    # Fond animé niche-aware — importé depuis assembler_service
+    from app.services.assembler_service import _create_animated_bg
     bg_tmp = output_path.replace(".mp4", "_bg.mp4")
-    if bg_video_path and os.path.exists(bg_video_path):
-        subprocess.run([
-            "ffmpeg", "-y", "-stream_loop", "-1", "-i", bg_video_path,
-            "-t", str(total_duration + 0.5),
-            "-vf", f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT},"
-                   "colorlevels=rimin=0:rimax=0.80:gimin=0:gimax=0.80:bimin=0:bimax=0.80",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "20", "-an",
-            "-loglevel", "quiet", bg_tmp
-        ], capture_output=True, timeout=120)
-    else:
-        subprocess.run([
-            "ffmpeg", "-y", "-f", "lavfi",
-            "-i", f"color=c=0x0f0f19:size={WIDTH}x{HEIGHT}:rate={FPS}",
-            "-t", str(total_duration + 0.5),
-            "-c:v", "libx264", "-preset", "fast",
-            "-loglevel", "quiet", bg_tmp
-        ], capture_output=True, timeout=30)
+    _create_animated_bg(bg_tmp, total_duration, topic=topic)
 
     # 4. Construire les filtres drawtext
     vf = _build_drawtext_filters(segments, durations)

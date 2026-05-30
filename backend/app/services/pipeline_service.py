@@ -109,10 +109,9 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
         print(f"[PIPELINE] Script final: {len(script.split())} mots")
         await _update_job(job_id, status="generating_audio", script=script)
 
-        (audio_bytes, word_boundaries), bg_video_path = await asyncio.gather(
-            tts_service.generate_audio(script),
-            _build_background(job_id, topic, duration),
-        )
+        # Fond animé généré par ffmpeg (plus professionnel que Pexels)
+        audio_bytes, word_boundaries = await tts_service.generate_audio(script)
+        bg_video_path = None
 
         audio_path = os.path.join(outputs_dir, f"audio_{job_id}.mp3")
         async with aiofiles.open(audio_path, "wb") as f:
@@ -132,11 +131,9 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
-            assembler_service.assemble_video,
-            audio_path,
-            chunks,
-            video_path,
-            bg_video_path,
+            lambda: assembler_service.assemble_video(
+                audio_path, chunks, video_path, bg_video_path, topic
+            ),
         )
 
         await _update_job(job_id, status="completed", video_url=f"/pipeline/{video_filename}")

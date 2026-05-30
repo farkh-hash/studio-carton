@@ -46,6 +46,43 @@ def _wrap_text(text: str, max_chars: int = 16) -> list[str]:
     return lines[:2]
 
 
+def _get_niche_colors(topic: str) -> tuple[str, str]:
+    """Retourne (couleur_base, couleur_accent) selon la niche détectée."""
+    t = topic.lower()
+    if any(w in t for w in ["finance", "argent", "invest", "bourse", "riche", "patrimoine", "crypto", "trading"]):
+        return "0x040C1E", "0x0A2050"   # Bleu nuit — Finance
+    if any(w in t for w in ["santé", "sante", "sport", "fitness", "maigrir", "nutrition", "regime"]):
+        return "0x041208", "0x082818"   # Vert sombre — Santé
+    if any(w in t for w in ["ia", "tech", "intelligence", "robot", "ai", "digital", "code", "app"]):
+        return "0x08040E", "0x16083A"   # Violet — Tech/IA
+    if any(w in t for w in ["amour", "relation", "psycho", "mental", "confiance", "anxiete"]):
+        return "0x140408", "0x280810"   # Rouge sombre — Psycho
+    if any(w in t for w in ["business", "entrepreneur", "startup", "vente", "marketing"]):
+        return "0x0E0A04", "0x2A1A06"   # Ambre sombre — Business
+    return "0x080614", "0x120A22"       # Violet profond — Défaut
+
+
+def _create_animated_bg(output_path: str, duration: float, topic: str = "") -> None:
+    """Génère un fond animé cinématique avec ffmpeg — zéro coût, zéro stock footage."""
+    base, accent = _get_niche_colors(topic)
+    subprocess.run([
+        "ffmpeg", "-y",
+        "-f", "lavfi",
+        "-i", f"color=c={base}:size={WIDTH}x{HEIGHT}:rate={FPS}",
+        "-t", str(duration + 1),
+        "-vf", (
+            # Gradient d'accent en surimpression douce
+            f"drawbox=x=0:y=0:w={WIDTH}:h={HEIGHT}:color={accent}@0.6:t=fill,"
+            # Grain cinématique animé — look film professionnel
+            "noise=alls=14:allf=t+u,"
+            # Vignette sombre sur les bords — met le texte en valeur
+            "vignette=PI/3"
+        ),
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-an",
+        "-loglevel", "quiet", output_path
+    ], capture_output=True, timeout=30)
+
+
 def _get_audio_duration(audio_path: str) -> float:
     r = subprocess.run([
         "ffprobe", "-v", "quiet", "-show_entries", "format=duration",
@@ -101,6 +138,7 @@ def assemble_video(
     chunks: List[SubtitleChunk],
     output_path: str,
     bg_video_path: str = None,
+    topic: str = "",
 ) -> str:
     font = _get_font()
     duration = _get_audio_duration(audio_path)
@@ -115,36 +153,9 @@ def assemble_video(
     ], capture_output=True, timeout=60)
     audio_to_use = audio_norm if os.path.exists(audio_norm) else audio_path
 
-    # 2. Fond vidéo avec zoom lent (effet cinématique) + assombrissement doux
+    # 2. Fond animé professionnel — niche-aware, zéro stock footage générique
     bg_tmp = output_path.replace(".mp4", "_bg.mp4")
-    if bg_video_path and os.path.exists(bg_video_path):
-        fps_dur = int(duration * FPS) + 10
-        subprocess.run([
-            "ffmpeg", "-y", "-stream_loop", "-1", "-i", bg_video_path,
-            "-t", str(duration + 1),
-            "-vf", (
-                # Scale légèrement plus grand pour permettre le zoom
-                f"scale=1200:2133:force_original_aspect_ratio=increase,"
-                f"crop=1200:2133,"
-                # Zoom lent Ken Burns — transforme n'importe quel clip en cinéma
-                f"zoompan=z='min(zoom+0.0008\\,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
-                f":d={fps_dur}:s={WIDTH}x{HEIGHT}:fps={FPS},"
-                # Assombrissement doux pour lisibilité sous-titres
-                "colorlevels=rimin=0:rimax=0.78:gimin=0:gimax=0.78:bimin=0:bimax=0.78,"
-                # Vignette sombre sur les bords — look cinématique
-                "vignette=PI/5"
-            ),
-            "-c:v", "libx264", "-preset", "fast", "-crf", "20", "-an",
-            "-loglevel", "quiet", bg_tmp
-        ], capture_output=True, timeout=180)
-    else:
-        # Fond dégradé sombre (fallback propre)
-        subprocess.run([
-            "ffmpeg", "-y", "-f", "lavfi",
-            "-i", f"color=c=0x050510:size={WIDTH}x{HEIGHT}:rate={FPS}",
-            "-t", str(duration + 1),
-            "-c:v", "libx264", "-preset", "fast", "-loglevel", "quiet", bg_tmp
-        ], capture_output=True, timeout=30)
+    _create_animated_bg(bg_tmp, duration, topic=topic)
 
     # 3. Filtres sous-titres ALL CAPS avec contour épais
     vf = _build_subtitle_filters(chunks, font)
