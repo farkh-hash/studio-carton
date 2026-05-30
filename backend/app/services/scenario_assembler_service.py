@@ -12,9 +12,14 @@ CHARACTER_COLORS_HEX = {
 }
 
 FONT_PATHS = [
+    # Linux / Railway (Docker)
     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/liberation/LiberationSans-Bold.ttf",
+    # Windows
+    "C:/Windows/Fonts/Inter-Bold-slnt=0.ttf",
+    "C:/Windows/Fonts/arialbd.ttf",
+    "C:/Windows/Fonts/arial.ttf",
 ]
 
 
