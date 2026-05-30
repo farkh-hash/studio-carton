@@ -27,10 +27,13 @@ def _call_ollama(messages: list, max_tokens: int, temperature: float) -> str:
     resp = httpx.post(
         f"{settings.OLLAMA_URL.rstrip('/')}/api/chat",
         json=payload,
-        timeout=120,
+        timeout=180,  # 3 min pour le cold start GPU
     )
     resp.raise_for_status()
-    return resp.json()["message"]["content"].strip()
+    # Forcer UTF-8 pour éviter les erreurs d'encodage Windows
+    import json as _json
+    data = _json.loads(resp.content.decode("utf-8"))
+    return data["message"]["content"].strip()
 
 
 def chat(messages: list, max_tokens: int = 2000, temperature: float = 0.8, system: str = None) -> str:

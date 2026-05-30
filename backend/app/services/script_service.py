@@ -231,4 +231,4 @@ RÈGLES ABSOLUES — NE PAS DÉVIER :
         )
 
     loop = asyncio.get_running_loop()
-    return await asyncio.wait_for(loop.run_in_executor(None, _call), timeout=45)
+    return await asyncio.wait_for(loop.run_in_executor(None, _call), timeout=120)

@@ -1,4 +1,13 @@
 import os
+import sys
+
+# Forcer UTF-8 sur Windows pour éviter les erreurs d'encodage avec les accents
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
