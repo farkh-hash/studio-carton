@@ -226,8 +226,6 @@ async def generate_script(topic: str, duration: int = 60, style: str = "viral", 
     if data.get("hooks"):
         best_hook = data["hooks"][0].get("hook", "")
 
-    client = Groq(api_key=settings.GROQ_API_KEY)
-
     hook_instruction = f'Commence EXACTEMENT par : "{best_hook}"' if best_hook else "Invente un hook choc en 5 mots maximum — fait surprenant ou question impossible à ignorer"
 
     prompt = f"""SUJET : {topic}
@@ -249,20 +247,18 @@ RÈGLES ABSOLUES :
 
 Écris le script maintenant :"""
 
+    from app.services.groq_client import chat as groq_chat
+
     def _call_groq():
-        return client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
+        return groq_chat(
+            messages=[{"role": "user", "content": prompt}],
+            system=SYSTEM_PROMPT,
             max_tokens=3000,
             temperature=0.78,
         )
 
     loop = asyncio.get_running_loop()
-    response = await asyncio.wait_for(
+    return await asyncio.wait_for(
         loop.run_in_executor(None, _call_groq),
-        timeout=45
+        timeout=60
     )
-    return response.choices[0].message.content.strip()
