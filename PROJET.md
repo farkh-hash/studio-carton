@@ -182,13 +182,15 @@ studio-carton/
 
 ### Session 4 — 2026-05-30
 
-**Refonte qualité pipeline vidéo :**
-- assembler_service.py : réécriture complète MoviePy → 100% ffmpeg (CRF 18, 192kbps AAC, loudnorm -14 LUFS, sous-titres drawtext avec ombres 8-directionnelles)
+**Refonte qualité pipeline vidéo + scripts :**
+- assembler_service.py : réécriture complète MoviePy → 100% ffmpeg (CRF 18, 192kbps AAC, loudnorm -14 LUFS, drawtext 90px jaune #FFE600, fond noir semi-transparent, 5 mots/chunk)
 - scenario_assembler_service.py : CRF 28→20 fond, 128k→192k audio, luminosité 65%→80%, loudnorm+faststart
-- background_service.py : CRF 26/28→20, fade plus rapide (0.8s→0.5s)
-- pipeline_service.py : suppression MoviePy (ffprobe à la place)
-- requirements.txt : suppression moviepy, Pillow, numpy (build Docker plus léger)
-- niche_service.py : hooks sans faux témoignages, contenu factuel et vérifiable uniquement
+- background_service.py : CRF 26/28→20, fade 0.8s→0.5s
+- pipeline_service.py : suppression MoviePy (ffprobe), sous-titres 3→5 mots/chunk
+- requirements.txt : moviepy/Pillow/numpy supprimés (build plus léger)
+- niche_service.py : hooks factuels uniquement, sans faux témoignages
+- script_service.py : SYSTEM_PROMPT reécrit (rythme haché, phrases 5-9 mots), prompt oral, température 0.82→0.78, fix SyntaxError f-string Python 3.11, Groq dans run_in_executor
+- tts_service.py : vitesse +5%→-3% (voix plus naturelle)
 
 ### Session 3 — 2026-05-30
 - Agent Monétisation : niche #1 = Immobilier (6500-14400€/mois), #2 = IA (4400-10000€/mois)
