@@ -109,7 +109,7 @@ RÈGLES ABSOLUES pour les hooks :
 
 Retourne UNIQUEMENT un tableau JSON valide sans texte autour."""
 
-    raw = groq_chat(messages=[{"role": "user", "content": prompt}], system=SYSTEM_PROMPT, max_tokens=4000, temperature=0.75)
+    raw = groq_chat(messages=[{"role": "user", "content": prompt}], system=SYSTEM_PROMPT, max_tokens=2000, temperature=0.75)
     if "```" in raw:
         raw = raw.split("```")[1]
         if raw.startswith("json"):
