@@ -11,16 +11,27 @@ STYLE_INSTRUCTIONS = {
     "humour": "Ton décalé et fun. Situation absurde, autodérision. Informer en faisant sourire.",
 }
 
-SYSTEM_PROMPT = """Tu es un expert des contenus viraux TikTok, YouTube Shorts et Instagram Reels.
-Tu crées des scripts COMPLETS, FLUIDES et PERCUTANTS — jamais des bullet points, toujours de la vraie parole naturelle.
+SYSTEM_PROMPT = """Tu es le meilleur scénariste de contenus courts viraux francophones.
+Tu génères des scripts qui se lisent à voix haute de façon naturelle, avec un rythme haché et addictif.
 
-Règles absolues :
-- PHRASES COMPLÈTES avec sujet + verbe + complément — jamais de fragments
-- Max 8-10 mots par phrase sauf le hook
-- Chaque phrase justifie la suivante (boucle ouverte)
-- Chiffres précis : "73%" pas "la plupart"
-- Zéro fausse promesse — fort mais honnête
-- Français parlé naturel, conversationnel"""
+RÈGLES DE RYTHME ABSOLUES :
+- Phrases de 5 à 9 mots maximum — jamais plus
+- Pas de virgules : remplace par des points
+- Chaque phrase = une idée unique
+- Alterne les longueurs : court. Puis un peu plus long. Puis très court.
+- Jamais de bullet points, listes, tirets, numéros
+- Jamais de guillemets, parenthèses, astérisques
+
+STRUCTURE QUI RETIENT L'ATTENTION :
+- Hook (2-4s) : choc immédiat, question ou affirmation surprenante
+- Développement : boucles ouvertes ("mais voilà le truc...", "et ce n'est pas tout...")
+- Chiffres précis uniquement : "73%" pas "beaucoup", "8 minutes" pas "quelques minutes"
+- CTA naturel en fin : question ou appel à l'action conversationnel
+
+EXEMPLE DE BON RYTHME :
+"Personne ne te dit ça. Pourtant c'est la règle numéro un. Quatre-vingt-dix pourcent des gens la violent chaque jour. Et ça leur coûte des heures. Parfois des années. Voici ce que les meilleurs font différemment."
+
+Génère UNIQUEMENT le texte à lire. Aucun titre, aucune annotation, aucun commentaire."""
 
 
 async def _run_all_research(topic: str, style: str) -> dict:
@@ -220,28 +231,27 @@ async def generate_script(topic: str, duration: int = 60, style: str = "viral", 
 
     hook_instruction = f'Utilise ce hook prouvé : "{best_hook}"' if best_hook else "Utilise les patterns prouvés ci-dessus pour créer un hook ultra-fort"
 
-    prompt = f"""Crée un script viral COMPLET et FLUIDE de {duration} secondes (~{target_words} mots).
+    prompt = f"""Écris un script de {duration} secondes environ {target_words} mots pour une vidéo virale sur :
 
 SUJET : {topic}
 STYLE : {style_note}
 
 {mega_context}
 
-STRUCTURE :
-- HOOK ({hook_sec}s) : {hook_instruction}
-- CONTENU ({content_sec}s) : développe en utilisant les faits réels, la douleur du persona, les techniques de rétention prouvées
-- CTA ({cta_sec}s) : utilise le CTA prouvé, question engageante
+HOOK à utiliser : {hook_instruction}
 
-RÈGLES ABSOLUES :
-- PHRASES COMPLÈTES — jamais de fragments ou bullet points
-- Max 8-10 mots par phrase
-- {target_words} mots minimum — script COMPLET du début à la fin
-- Langage parlé naturel, conversationnel
-- Zéro fausse promesse
-- Commence directement par le hook, aucun préambule
-- EXEMPLE de bon rythme : "73% des gens qui essaient ça font une erreur fatale. Et personne ne leur dit laquelle. Jusqu'à aujourd'hui."
+CONSIGNES STRICTES :
+- Commence DIRECTEMENT par le hook, sans introduction
+- Phrases courtes : 5 à 9 mots maximum chacune
+- Pas de ponctuation complexe — uniquement des points et points d'exclamation
+- Langage oral : comme si tu parlais à un ami
+- Chiffres réels et vérifiables uniquement
+- Enchaine les révélations pour forcer à regarder jusqu'à la fin
+- Termine par une question ou un appel à l'action naturel
 
-Écris le script complet maintenant :"""
+LONGUEUR : exactement entre {target_words - 15} et {target_words + 15} mots.
+
+Script :"""
 
     def _call_groq():
         return client.chat.completions.create(
@@ -251,7 +261,7 @@ RÈGLES ABSOLUES :
                 {"role": "user", "content": prompt},
             ],
             max_tokens=3000,
-            temperature=0.82,
+            temperature=0.78,
         )
 
     loop = asyncio.get_event_loop()

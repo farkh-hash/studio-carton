@@ -24,7 +24,7 @@ async def _run_edge_tts(text: str, voice: str) -> tuple[bytes, list]:
     audio_chunks = []
     word_boundaries = []
 
-    communicate = edge_tts.Communicate(text, voice, rate="+5%")
+    communicate = edge_tts.Communicate(text, voice, rate="-3%")
 
     # Utilise .stream() pour la compatibilité avec toutes les versions
     async for chunk in communicate.stream():

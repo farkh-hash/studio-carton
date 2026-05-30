@@ -60,17 +60,16 @@ def _build_subtitle_filters(chunks: List[SubtitleChunk], font: str) -> str:
         return ""
 
     filters = []
-    FONT_SIZE = 82
-    LINE_H = 96
+    FONT_SIZE = 90
+    LINE_H = 108
 
     for chunk in chunks:
         t_start = chunk.start
         t_end = chunk.end
-        # \, = virgule échappée pour le parser de filtres ffmpeg
         enable = f"'gte(t\\,{t_start:.3f})*lte(t\\,{t_end:.3f})'"
 
-        lines = _wrap_text(chunk.text, max_chars=20)
-        base_y = HEIGHT - 460
+        lines = _wrap_text(chunk.text, max_chars=24)
+        base_y = HEIGHT - 480
 
         for i, line_text in enumerate(lines):
             escaped = _escape_ffmpeg(line_text)
@@ -78,17 +77,22 @@ def _build_subtitle_filters(chunks: List[SubtitleChunk], font: str) -> str:
                 continue
             y = base_y + i * LINE_H
 
-            # 8 ombres directionnelles pour lisibilité maximale
-            for dx, dy in [(-4, -4), (-4, 4), (4, -4), (4, 4),
-                           (0, 5), (0, -5), (5, 0), (-5, 0)]:
-                filters.append(
-                    f"drawtext=fontfile='{font}':text='{escaped}':fontsize={FONT_SIZE}:"
-                    f"fontcolor=black@0.95:x=(w-tw)/2+{dx}:y={y+dy}:enable={enable}"
-                )
-            # Texte principal blanc
+            # Fond semi-transparent derrière le texte pour lisibilité maximale
             filters.append(
                 f"drawtext=fontfile='{font}':text='{escaped}':fontsize={FONT_SIZE}:"
-                f"fontcolor=white:x=(w-tw)/2:y={y}:enable={enable}"
+                f"fontcolor=white@0.0:x=(w-tw)/2:y={y}:"
+                f"box=1:boxcolor=black@0.55:boxborderw=18:enable={enable}"
+            )
+            # Contour sombre (4 passes)
+            for dx, dy in [(-3, -3), (-3, 3), (3, -3), (3, 3)]:
+                filters.append(
+                    f"drawtext=fontfile='{font}':text='{escaped}':fontsize={FONT_SIZE}:"
+                    f"fontcolor=black@0.9:x=(w-tw)/2+{dx}:y={y+dy}:enable={enable}"
+                )
+            # Texte jaune vif — couleur signature TikTok
+            filters.append(
+                f"drawtext=fontfile='{font}':text='{escaped}':fontsize={FONT_SIZE}:"
+                f"fontcolor=0xFFE600:x=(w-tw)/2:y={y}:enable={enable}"
             )
 
     return ",".join(filters)
