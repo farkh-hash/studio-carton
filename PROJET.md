@@ -180,6 +180,43 @@ studio-carton/
 
 ## Historique des sessions
 
+### Session 5 — 2026-05-30 (soir)
+
+**GPU local Ollama + corrections critiques :**
+
+Infrastructure GPU locale :
+- Ollama installé (winget) sur Windows avec RTX 4070 12GB
+- Modèle Qwen 2.5 14B téléchargé (8.4GB, scripts de bien meilleure qualité)
+- groq_client.py : cascade Ollama GPU → Groq 70B → Groq 8B → Gemma2
+- chat() = Ollama+Groq pour les scripts (qualité), chat_fast() = Groq seul pour les agents (rapidité)
+- App locale : python -m uvicorn sur port 8000, frontend React buildé localement
+- START_GPU.bat : script démarrage one-click GPU
+- Videos stockées dans C:\data\outputs\pipeline\ (volume Windows /data)
+- add_credits.py : script pour ajouter crédits en local
+
+Bugs corrigés :
+- Sous-titres invisibles sur Windows → polices Linux introuvables → ajout C:/Windows/Fonts/arialbd.ttf
+- WinError 206 (commande trop longue) → drawtext × 300 filtres → migration vers fichiers .ass
+- Sous-titres ASS : blanc gras centré, Arial 96px, contour noir 6px
+- Fond : suppression hue rotation (rendait la couleur rose aléatoire) → fond noir pur #0A0A0A
+- Audio 96kHz → aresample=44100 avant loudnorm
+- UnicodeEncodeError sur prints avec → et ✓ → remplacement ASCII
+- Clé Groq révoquée (exposée en session) → nouvelle clé mise à jour Railway + .env
+- agents Tendances/Niches timeout Ollama → chat_fast() Groq direct pour agents
+- WinError 206 sur Inter-Bold-slnt=0.ttf → le = dans le nom casse le parser ffmpeg
+
+État en fin de session :
+- App locale FONCTIONNELLE (localhost:8000)
+- Vidéo générée avec sous-titres visibles (fond noir + texte blanc gras centré)
+- GPU opérationnel pour les scripts (Qwen 14B)
+- Railway déployé avec les fixes
+
+A FAIRE (priorité) :
+- [ ] La qualité vidéo est encore insuffisante pour poster (2-3/10)
+- [ ] Comprendre exactement ce que l'utilisateur veut comme style visuel (référence TikTok)
+- [ ] Le fond noir générique ne ressemble pas aux vrais contenus viraux
+- [ ] Clarifier les vraies consignes sur l'agent viral (montrer des vraies vidéos virales + pourquoi)
+
 ### Session 4 — 2026-05-30
 
 **Refonte qualité pipeline vidéo + scripts :**
