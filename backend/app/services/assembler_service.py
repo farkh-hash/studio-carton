@@ -12,8 +12,7 @@ FONT_PATHS = [
     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/liberation/LiberationSans-Bold.ttf",
-    # Windows
-    "C:/Windows/Fonts/Inter-Bold-slnt=0.ttf",
+    # Windows (sans caracteres speciaux dans le nom)
     "C:/Windows/Fonts/arialbd.ttf",
     "C:/Windows/Fonts/arial.ttf",
 ]
@@ -102,42 +101,52 @@ def _get_audio_duration(audio_path: str) -> float:
         return 60.0
 
 
-def _build_subtitle_filters(chunks: List[SubtitleChunk], font: str) -> str:
-    if not font or not chunks:
-        return ""
+def _sec_to_ass(t: float) -> str:
+    """Convertit un temps en secondes vers le format ASS H:MM:SS.cc"""
+    h = int(t // 3600)
+    m = int((t % 3600) // 60)
+    s = int(t % 60)
+    cs = int((t - int(t)) * 100)
+    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
-    filters = []
-    FONT_SIZE = 112
-    LINE_H = 130
-    # Position dans le tiers inférieur — lisible sans gêner le visage
-    BASE_Y = HEIGHT - 520
 
+def _generate_ass_subtitles(chunks: List[SubtitleChunk]) -> str:
+    """Génère un fichier ASS avec les sous-titres stylés (jaune, gras, contour noir)."""
+    # Style viral : jaune #FFE600, gros, contour noir épais
+    # Couleurs ASS format &HAABBGGRR (alpha, blue, green, red)
+    yellow = "&H0000E6FF"   # #FFE600 en ABGR
+    black  = "&H00000000"
+    shadow = "&H80000000"   # noir semi-transparent
+
+    ass = f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {WIDTH}
+PlayResY: {HEIGHT}
+WrapStyle: 1
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,88,{yellow},{yellow},{black},{shadow},-1,0,0,0,100,100,0,0,1,5,1,2,60,60,200,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
     for chunk in chunks:
-        t_start = chunk.start
-        t_end = chunk.end
-        enable = f"'gte(t\\,{t_start:.3f})*lte(t\\,{t_end:.3f})'"
+        start = _sec_to_ass(chunk.start)
+        end = _sec_to_ass(chunk.end)
+        # Texte clean (uppercase, sans caractères spéciaux ASS)
+        text = chunk.text.upper()
+        text = text.replace("{", "").replace("}", "").replace("\\", "")
+        text = text.replace("'", " ").replace('"', " ")
+        if text.strip():
+            ass += f"Dialogue: 0,{start},{end},Default,,0,0,0,,{text}\n"
 
-        lines = _wrap_text(chunk.text, max_chars=16)
+    return ass
 
-        for i, line_text in enumerate(lines):
-            escaped = _escape_ffmpeg(line_text)
-            if not escaped:
-                continue
-            y = BASE_Y + i * LINE_H
 
-            # Contour noir épais (6 passes) — lisible sur tout fond
-            for dx, dy in [(-4, -4), (-4, 4), (4, -4), (4, 4), (0, 5), (0, -5)]:
-                filters.append(
-                    f"drawtext=fontfile='{font}':text='{escaped}':fontsize={FONT_SIZE}:"
-                    f"fontcolor=black:x=(w-tw)/2+{dx}:y={y+dy}:enable={enable}"
-                )
-            # Texte JAUNE — couleur signature virale TikTok/Shorts
-            filters.append(
-                f"drawtext=fontfile='{font}':text='{escaped}':fontsize={FONT_SIZE}:"
-                f"fontcolor=0xFFE600:x=(w-tw)/2:y={y}:enable={enable}"
-            )
-
-    return ",".join(filters)
+def _build_subtitle_filters(chunks: List[SubtitleChunk], font: str) -> str:
+    """Retourne le filtre ffmpeg pour les sous-titres (vide = pas de sous-titres)."""
+    return ""  # Géré séparément via ASS
 
 
 def assemble_video(
@@ -164,9 +173,20 @@ def assemble_video(
     bg_tmp = output_path.replace(".mp4", "_bg.mp4")
     _create_animated_bg(bg_tmp, duration, topic=topic)
 
-    # 3. Filtres sous-titres ALL CAPS avec contour épais
-    vf = _build_subtitle_filters(chunks, font)
-    vf = vf if vf else "null"
+    # 3. Générer le fichier de sous-titres ASS
+    # Important: utiliser un chemin SANS deux-points pour le filtre ffmpeg
+    filter_file = None
+    vf = "null"
+    if chunks and font:
+        ass_content = _generate_ass_subtitles(chunks)
+        # Placer le fichier ASS au même endroit que la vidéo (chemin sans C:)
+        filter_file = output_path.replace(".mp4", "_subs.ass")
+        with open(filter_file, "w", encoding="utf-8") as f:
+            f.write(ass_content)
+        # Chemin pour ffmpeg : forward slashes, pas de drive letter Windows
+        ass_path = filter_file.replace("\\", "/")
+        # Sur Windows, /data/... → ffmpeg le résout correctement
+        vf = f"ass='{ass_path}'"
 
     # 4. Assemblage final — CRF 18 haute qualité, faststart pour web
     cmd = [
@@ -185,9 +205,9 @@ def assemble_video(
     ]
     result = subprocess.run(cmd, capture_output=True, timeout=300)
 
-    for f in [bg_tmp, audio_norm]:
+    for f in [bg_tmp, audio_norm, filter_file]:
         try:
-            if os.path.exists(f):
+            if f and os.path.exists(str(f)):
                 os.remove(f)
         except Exception:
             pass

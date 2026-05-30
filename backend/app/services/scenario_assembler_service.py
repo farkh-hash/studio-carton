@@ -16,8 +16,7 @@ FONT_PATHS = [
     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/liberation/LiberationSans-Bold.ttf",
-    # Windows
-    "C:/Windows/Fonts/Inter-Bold-slnt=0.ttf",
+    # Windows (sans caracteres speciaux dans le nom)
     "C:/Windows/Fonts/arialbd.ttf",
     "C:/Windows/Fonts/arial.ttf",
 ]

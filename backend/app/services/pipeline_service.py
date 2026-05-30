@@ -120,10 +120,10 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
         await _update_job(job_id, status="assembling_video")
 
         if word_boundaries:
-            chunks = subtitle_service.build_subtitles_from_words(word_boundaries, words_per_chunk=2)
+            chunks = subtitle_service.build_subtitles_from_words(word_boundaries, words_per_chunk=5)
         else:
             audio_duration = assembler_service._get_audio_duration(audio_path)
-            chunks = subtitle_service.build_subtitles(script, audio_duration, words_per_chunk=2)
+            chunks = subtitle_service.build_subtitles(script, audio_duration, words_per_chunk=5)
 
         video_filename = f"video_{job_id}.mp4"
         video_path = os.path.join(outputs_dir, video_filename)
