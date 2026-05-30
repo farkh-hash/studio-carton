@@ -63,24 +63,26 @@ def _get_niche_colors(topic: str) -> tuple[str, str]:
 
 
 def _create_animated_bg(output_path: str, duration: float, topic: str = "") -> None:
-    """Génère un fond animé cinématique avec ffmpeg — zéro coût, zéro stock footage."""
+    """Génère un fond dégradé cinématique avec ffmpeg — rapide et propre."""
     base, accent = _get_niche_colors(topic)
+    h_mid = HEIGHT // 2
+    h_bot = HEIGHT // 4
     subprocess.run([
         "ffmpeg", "-y",
         "-f", "lavfi",
         "-i", f"color=c={base}:size={WIDTH}x{HEIGHT}:rate={FPS}",
         "-t", str(duration + 1),
         "-vf", (
-            # Gradient d'accent en surimpression douce
-            f"drawbox=x=0:y=0:w={WIDTH}:h={HEIGHT}:color={accent}@0.6:t=fill,"
-            # Grain cinématique animé — look film professionnel
-            "noise=alls=14:allf=t+u,"
-            # Vignette sombre sur les bords — met le texte en valeur
-            "vignette=PI/3"
+            # Couche de couleur d'accent en haut
+            f"drawbox=x=0:y=0:w={WIDTH}:h={h_mid}:color={accent}@0.55:t=fill,"
+            # Assombrissement bas (dégradé vers le noir)
+            f"drawbox=x=0:y={h_mid}:w={WIDTH}:h={h_bot}:color=black@0.25:t=fill,"
+            # Vignette cinématique — bords sombres, centre lumineux
+            "vignette=PI/3.5"
         ),
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-an",
         "-loglevel", "quiet", output_path
-    ], capture_output=True, timeout=30)
+    ], capture_output=True, timeout=60)
 
 
 def _get_audio_duration(audio_path: str) -> float:
