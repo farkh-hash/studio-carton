@@ -162,7 +162,7 @@ async def analyze_monetisation(target_subscribers: int = 50000) -> dict:
     affiliate_results = await asyncio.gather(*affiliate_tasks, return_exceptions=True)
 
     # Analyse Groq avec fallback automatique
-    from app.services.groq_client import chat as groq_chat
+    from app.services.groq_client import chat_fast as groq_chat
 
     niche_context = json.dumps([
         {

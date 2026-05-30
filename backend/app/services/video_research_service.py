@@ -1,4 +1,4 @@
-﻿import httpx
+import httpx
 import json
 import re
 import asyncio

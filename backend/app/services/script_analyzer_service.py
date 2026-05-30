@@ -7,7 +7,7 @@ def analyze_script_deeply(transcript: str, title: str = "") -> dict:
     Analyse profonde d'un vrai script viral.
     Extrait les techniques exactes qui font que ce contenu performe.
     """
-    from app.services.groq_client import chat as groq_chat
+    from app.services.groq_client import chat_fast as groq_chat
 
     prompt = f"""Tu es un expert en psychologie du contenu viral. Analyse ce script réel d'une vidéo qui cartonne.
 
@@ -61,7 +61,7 @@ def synthesize_analyses(analyses: list[dict]) -> dict:
     if not analyses:
         return {}
 
-    from app.services.groq_client import chat as groq_chat
+    from app.services.groq_client import chat_fast as groq_chat
 
     analyses_text = json.dumps(analyses, ensure_ascii=False, indent=2)
 

@@ -7,7 +7,7 @@ def build_persona(topic: str, platform: str = "tiktok") -> dict:
     Construit le profil exact du spectateur cible pour ce sujet.
     Plus le profil est précis, plus le script sera ciblé et impactant.
     """
-    from app.services.groq_client import chat as groq_chat
+    from app.services.groq_client import chat_fast as groq_chat
 
     prompt = f"""Tu es expert en psychologie des audiences sociales (TikTok, YouTube, Instagram).
 

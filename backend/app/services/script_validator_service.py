@@ -8,7 +8,7 @@ def validate_script(script: str, topic: str, duration: int) -> dict:
     Valide un script sur plusieurs critères.
     Retourne un score global et des recommandations.
     """
-    from app.services.groq_client import chat as groq_chat
+    from app.services.groq_client import chat_fast as groq_chat
 
     word_count = len(script.split())
     target_words = int(duration * 2.2)  # ~2.2 mots/seconde en français naturel

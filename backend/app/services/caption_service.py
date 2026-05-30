@@ -3,7 +3,7 @@ import json
 
 def generate_captions(topic: str, script: str, niche: str = "") -> dict:
     """Génère les captions/titres/hashtags optimisés pour chaque plateforme."""
-    from app.services.groq_client import chat as groq_chat
+    from app.services.groq_client import chat_fast as groq_chat
 
     prompt = f"""Tu es expert en stratégie de publication sur les réseaux sociaux.
 

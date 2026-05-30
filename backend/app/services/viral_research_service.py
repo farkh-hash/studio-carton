@@ -7,7 +7,7 @@ async def research_viral_patterns(topic: str, platform: str = "tiktok") -> dict:
     Analyse les patterns viraux pour ce sujet sur les réseaux sociaux.
     Retourne les insights pour créer un script optimisé.
     """
-    from app.services.groq_client import chat as groq_chat
+    from app.services.groq_client import chat_fast as groq_chat
 
     research_prompt = f"""Tu es un analyste expert en contenu viral avec accès aux données de performance TikTok, YouTube Shorts et Instagram Reels.
 

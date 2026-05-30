@@ -1,9 +1,7 @@
 """
-Client LLM unifie avec cascade automatique :
-1. Ollama local (GPU) si OLLAMA_URL est configure
-2. Groq llama-3.3-70b (gratuit, haute qualite)
-3. Groq llama-3.1-8b  (500k tokens/jour, fallback)
-4. Groq gemma2-9b     (backup final)
+Client LLM avec deux modes :
+- chat()       : Ollama GPU (script) -> Groq fallback
+- chat_fast()  : Groq uniquement (agents tendances/niches/monetisation)
 """
 from app.core.config import settings
 from groq import Groq
@@ -16,7 +14,7 @@ GROQ_FALLBACK_MODELS = [
 
 
 def _call_ollama(messages: list, max_tokens: int, temperature: float) -> str:
-    """Appel vers Ollama local (GPU)."""
+    """Appel vers Ollama local (GPU) - pour la generation de scripts."""
     import httpx
     import json as _json
     payload = {
@@ -35,21 +33,8 @@ def _call_ollama(messages: list, max_tokens: int, temperature: float) -> str:
     return data["message"]["content"].strip()
 
 
-def chat(messages: list, max_tokens: int = 2000, temperature: float = 0.8, system: str = None) -> str:
-    """Appel LLM : Ollama GPU -> Groq 70B -> Groq 8B -> Gemma2"""
-    if system:
-        messages = [{"role": "system", "content": system}] + messages
-
-    # 1. Ollama local en priorite (GPU, illimite)
-    if settings.OLLAMA_URL:
-        try:
-            result = _call_ollama(messages, max_tokens, temperature)
-            print(f"[LLM] Ollama ({settings.OLLAMA_MODEL}) OK")
-            return result
-        except Exception as e:
-            print(f"[LLM] Ollama indisponible ({type(e).__name__}) -> fallback Groq")
-
-    # 2. Groq avec cascade de modeles
+def _call_groq(messages: list, max_tokens: int, temperature: float) -> str:
+    """Appel Groq avec cascade de modeles."""
     client = Groq(api_key=settings.GROQ_API_KEY)
     for model in GROQ_FALLBACK_MODELS:
         try:
@@ -68,5 +53,33 @@ def chat(messages: list, max_tokens: int = 2000, temperature: float = 0.8, syste
                 print(f"[LLM] Rate limit {model} -> suivant...")
                 continue
             raise
+    raise RuntimeError("Tous les modeles Groq sont en rate limit.")
 
-    raise RuntimeError("Tous les LLM sont indisponibles. Reessaie dans 30 minutes.")
+
+def chat(messages: list, max_tokens: int = 2000, temperature: float = 0.8, system: str = None) -> str:
+    """
+    Pour la generation de SCRIPTS : Ollama GPU d'abord, Groq en fallback.
+    Ollama = meilleure qualite, pas de rate limit.
+    """
+    if system:
+        messages = [{"role": "system", "content": system}] + messages
+
+    if settings.OLLAMA_URL:
+        try:
+            result = _call_ollama(messages, max_tokens, temperature)
+            print(f"[LLM] Ollama OK ({settings.OLLAMA_MODEL})")
+            return result
+        except Exception as e:
+            print(f"[LLM] Ollama ({type(e).__name__}) -> Groq fallback")
+
+    return _call_groq(messages, max_tokens, temperature)
+
+
+def chat_fast(messages: list, max_tokens: int = 2000, temperature: float = 0.8, system: str = None) -> str:
+    """
+    Pour les AGENTS (tendances, niches, monetisation) : Groq uniquement.
+    Rapide, pas de timeout Ollama sur les grands prompts.
+    """
+    if system:
+        messages = [{"role": "system", "content": system}] + messages
+    return _call_groq(messages, max_tokens, temperature)

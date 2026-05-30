@@ -234,7 +234,7 @@ async def analyze_trends() -> dict:
             context += f"- {t}\n"
 
     # Analyse Groq avec fallback automatique
-    from app.services.groq_client import chat as groq_chat
+    from app.services.groq_client import chat_fast as groq_chat
 
     prompt = f"""Analyse ces données réelles de tendances virales du {today} sur TOUS les réseaux sociaux francophones (YouTube, TikTok, Instagram, Reddit).
 

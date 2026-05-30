@@ -90,7 +90,7 @@ async def analyze_competitors(topic: str) -> dict:
         return {}
 
     # Analyse Groq des patterns des concurrents
-    from app.services.groq_client import chat as groq_chat
+    from app.services.groq_client import chat_fast as groq_chat
     context = json.dumps(competitor_data, ensure_ascii=False, indent=2)
 
     prompt = f"""Analyse ces chaînes concurrentes qui cartonnent sur le sujet "{topic}".

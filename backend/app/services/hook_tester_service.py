@@ -6,7 +6,7 @@ def generate_and_score_hooks(topic: str, analysis_context: str = "") -> list[dic
     Génère 5 hooks différents pour le sujet et les évalue.
     Retourne la liste triée par score décroissant.
     """
-    from app.services.groq_client import chat as groq_chat
+    from app.services.groq_client import chat_fast as groq_chat
 
     context_section = f"\nCONTEXTE des scripts viraux analysés :\n{analysis_context}" if analysis_context else ""
 

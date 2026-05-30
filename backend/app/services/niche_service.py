@@ -64,7 +64,7 @@ Tu réponds toujours en JSON valide uniquement."""
 
 
 def analyze_niches() -> list[dict]:
-    from app.services.groq_client import chat as groq_chat
+    from app.services.groq_client import chat_fast as groq_chat
     today = date.today().strftime("%d/%m/%Y")
 
     niche_context = json.dumps(
@@ -120,7 +120,7 @@ Retourne UNIQUEMENT un tableau JSON valide sans texte autour."""
 
 
 def generate_script_from_topic(topic: str, hook: str, niche: str, format_duration: str, style: str = "viral") -> str:
-    from app.services.groq_client import chat as groq_chat
+    from app.services.groq_client import chat_fast as groq_chat
 
     duration_map = {"30s": 30, "60s": 60, "90s": 90, "2min": 120, "3min": 180}
     duration = duration_map.get(format_duration, 60)
