@@ -130,17 +130,16 @@ def _build_subtitle_filters(chunks: List[SubtitleChunk], font: str) -> str:
                 continue
             y = BASE_Y + i * LINE_H
 
-            # Contour épais — 8 passes pour un rendu solide sur n'importe quel fond
-            for dx, dy in [(-5, -5), (-5, 0), (-5, 5), (0, -5),
-                           (0, 5), (5, -5), (5, 0), (5, 5)]:
+            # Contour noir épais (6 passes) — lisible sur tout fond
+            for dx, dy in [(-4, -4), (-4, 4), (4, -4), (4, 4), (0, 5), (0, -5)]:
                 filters.append(
                     f"drawtext=fontfile='{font}':text='{escaped}':fontsize={FONT_SIZE}:"
                     f"fontcolor=black:x=(w-tw)/2+{dx}:y={y+dy}:enable={enable}"
                 )
-            # Texte blanc principal — net et lisible
+            # Texte JAUNE — couleur signature virale TikTok/Shorts
             filters.append(
                 f"drawtext=fontfile='{font}':text='{escaped}':fontsize={FONT_SIZE}:"
-                f"fontcolor=white:x=(w-tw)/2:y={y}:enable={enable}"
+                f"fontcolor=0xFFE600:x=(w-tw)/2:y={y}:enable={enable}"
             )
 
     return ",".join(filters)

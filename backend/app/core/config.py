@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     GROQ_MODEL_PRIMARY: str = "llama-3.3-70b-versatile"
     GROQ_MODEL_FALLBACK: str = "llama-3.1-8b-instant"
+    OLLAMA_URL: str = ""          # Ex: http://ton-ip:11434 — active le GPU local
+    OLLAMA_MODEL: str = "qwen2.5:14b"  # Modèle Ollama à utiliser
     PEXELS_API_KEY: str = ""
     YOUTUBE_API_KEY: str = ""
     STRIPE_SECRET_KEY: str = ""
