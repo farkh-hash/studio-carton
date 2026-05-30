@@ -241,13 +241,20 @@ RÈGLES ABSOLUES :
 
 Écris le script complet maintenant :"""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
-        max_tokens=3000,
-        temperature=0.82,
+    def _call_groq():
+        return client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=3000,
+            temperature=0.82,
+        )
+
+    loop = asyncio.get_event_loop()
+    response = await asyncio.wait_for(
+        loop.run_in_executor(None, _call_groq),
+        timeout=45
     )
     return response.choices[0].message.content.strip()

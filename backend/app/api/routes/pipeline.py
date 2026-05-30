@@ -22,8 +22,11 @@ class ScriptPreviewRequest(BaseModel):
 @router.post("/preview-script")
 async def preview_script(req: ScriptPreviewRequest):
     from app.services import script_service
-    script = await script_service.generate_script(req.topic, req.duration, req.style, req.hook_type)
-    return {"script": script, "topic": req.topic, "duration": req.duration, "style": req.style}
+    try:
+        script = await script_service.generate_script(req.topic, req.duration, req.style, req.hook_type)
+        return {"script": script, "topic": req.topic, "duration": req.duration, "style": req.style}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/generate")

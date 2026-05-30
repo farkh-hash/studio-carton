@@ -50,8 +50,8 @@ export default function PipelineForm({ onJobCreated, initialTopic = "", initialS
       const res = await axios.post("/api/pipeline/preview-script", { topic, duration, style, hook_type: hookType });
       setScript(res.data.script);
       setStep("preview");
-    } catch {
-      setError("Erreur lors de la génération du script.");
+    } catch (err) {
+      setError(err.response?.data?.detail || "Erreur lors de la génération du script.");
     } finally {
       setPreviewLoading(false);
     }
