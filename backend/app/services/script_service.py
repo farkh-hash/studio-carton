@@ -197,68 +197,38 @@ def _build_mega_context(data: dict, topic: str) -> str:
 
 
 async def generate_script(topic: str, duration: int = 60, style: str = "viral", hook_type: str = "auto") -> str:
-    """
-    Génère un script viral en utilisant les 5 agents :
-    1. Analyse profonde des vrais scripts
-    2. Multi-hook testé et scoré
-    3. Persona/audience ciblée
-    4. (Validateur intégré dans pipeline_service)
-    5. Analyse concurrents
-    """
+    """Un seul appel Groq avec prompt béton — rapide, économe, qualité maximale."""
+    from app.services.groq_client import chat as groq_chat
+
     target_words = WORD_COUNTS.get(duration, 140)
     style_note = STYLE_INSTRUCTIONS.get(style, STYLE_INSTRUCTIONS["viral"])
 
-    hook_sec = min(5, duration // 10)
-    cta_sec = min(10, duration // 8)
-    content_sec = duration - hook_sec - cta_sec
-
-    # Lancer tous les agents en parallèle
-    try:
-        data = await _run_all_research(topic, style)
-        mega_context = _build_mega_context(data, topic)
-    except Exception as e:
-        print(f"[SCRIPT] Erreur agents: {e}")
-        mega_context = ""
-        data = {}
-
-    # Utiliser le meilleur hook généré par l'Agent 2
-    best_hook = ""
-    if data.get("hooks"):
-        best_hook = data["hooks"][0].get("hook", "")
-
-    hook_instruction = f'Commence EXACTEMENT par : "{best_hook}"' if best_hook else "Invente un hook choc en 5 mots maximum — fait surprenant ou question impossible à ignorer"
-
     prompt = f"""SUJET : {topic}
 STYLE : {style_note}
-DURÉE : {duration} secondes — environ {target_words} mots
+DURÉE : {duration} secondes — EXACTEMENT {target_words} mots
 
-{mega_context}
+STRUCTURE :
+1. HOOK (5 mots max) : fait choc ou question impossible à ignorer. Commence directement.
+2. DÉVELOPPEMENT : révélations enchaînées, chaque phrase force à écouter la suivante.
+3. CTA final : question courte et engageante.
 
-HOOK : {hook_instruction}
+RÈGLES ABSOLUES — NE PAS DÉVIER :
+- Phrases de 4 à 7 mots. Point après chaque phrase. JAMAIS de virgule.
+- Chiffres en toutes lettres : "soixante-treize pourcent" pas "73%"
+- JAMAIS : "Voici", "Découvrez", "Dans cette vidéo", "Aujourd'hui je vais"
+- JAMAIS : listes, tirets, numéros, guillemets, parenthèses
+- Langage oral, naturel, direct. Comme si tu parlais à un ami.
+- LONGUEUR STRICTE : {target_words} mots (±5 mots maximum)
 
-RÈGLES ABSOLUES :
-1. Commence par le hook. Rien avant.
-2. Phrases de 4 à 7 mots. Un point après chaque phrase.
-3. Chiffres en lettres : "soixante-quinze pourcent" jamais "75%".
-4. Zéro virgule. Zéro liste. Zéro "Voici" ou "Découvrez".
-5. Chaque phrase rend la suivante impossible à ne pas écouter.
-6. Fin : une question courte et engageante.
-7. LONGUEUR STRICTE : entre {target_words - 10} et {target_words + 10} mots.
+Écris le script maintenant, directement, sans titre ni commentaire :"""
 
-Écris le script maintenant :"""
-
-    from app.services.groq_client import chat as groq_chat
-
-    def _call_groq():
+    def _call():
         return groq_chat(
             messages=[{"role": "user", "content": prompt}],
             system=SYSTEM_PROMPT,
-            max_tokens=3000,
-            temperature=0.78,
+            max_tokens=2000,
+            temperature=0.75,
         )
 
     loop = asyncio.get_running_loop()
-    return await asyncio.wait_for(
-        loop.run_in_executor(None, _call_groq),
-        timeout=60
-    )
+    return await asyncio.wait_for(loop.run_in_executor(None, _call), timeout=45)

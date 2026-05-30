@@ -46,43 +46,54 @@ def _wrap_text(text: str, max_chars: int = 16) -> list[str]:
     return lines[:2]
 
 
-def _get_niche_colors(topic: str) -> tuple[str, str]:
-    """Retourne (couleur_base, couleur_accent) selon la niche détectée."""
+def _get_niche_color(topic: str) -> str:
+    """Couleur dominante selon la niche — assez sombre pour les sous-titres mais clairement colorée."""
     t = topic.lower()
     if any(w in t for w in ["finance", "argent", "invest", "bourse", "riche", "patrimoine", "crypto", "trading"]):
-        return "0x040C1E", "0x0A2050"   # Bleu nuit — Finance
+        return "0x0D2444"   # Bleu marine foncé
     if any(w in t for w in ["santé", "sante", "sport", "fitness", "maigrir", "nutrition", "regime"]):
-        return "0x041208", "0x082818"   # Vert sombre — Santé
+        return "0x0A2A14"   # Vert forêt foncé
     if any(w in t for w in ["ia", "tech", "intelligence", "robot", "ai", "digital", "code", "app"]):
-        return "0x08040E", "0x16083A"   # Violet — Tech/IA
-    if any(w in t for w in ["amour", "relation", "psycho", "mental", "confiance", "anxiete"]):
-        return "0x140408", "0x280810"   # Rouge sombre — Psycho
+        return "0x1A0A3A"   # Violet indigo
+    if any(w in t for w in ["amour", "relation", "psycho", "mental", "confiance"]):
+        return "0x2A0A14"   # Rouge bordeaux
     if any(w in t for w in ["business", "entrepreneur", "startup", "vente", "marketing"]):
-        return "0x0E0A04", "0x2A1A06"   # Ambre sombre — Business
-    return "0x080614", "0x120A22"       # Violet profond — Défaut
+        return "0x1E1205"   # Marron doré foncé
+    return "0x120A2E"       # Violet profond — défaut
 
 
 def _create_animated_bg(output_path: str, duration: float, topic: str = "") -> None:
-    """Génère un fond dégradé cinématique avec ffmpeg — rapide et propre."""
-    base, accent = _get_niche_colors(topic)
-    h_mid = HEIGHT // 2
-    h_bot = HEIGHT // 4
-    subprocess.run([
+    """Génère un fond dégradé avec ffmpeg — visible et professionnel."""
+    color = _get_niche_color(topic)
+    # Couleur légèrement plus claire pour le haut (dégradé)
+    r = int(color[2:4], 16)
+    g = int(color[4:6], 16)
+    b = int(color[6:8], 16)
+    # Accent = +40% luminosité sur chaque canal
+    ar = min(255, int(r * 1.8 + 30))
+    ag = min(255, int(g * 1.8 + 25))
+    ab = min(255, int(b * 1.8 + 35))
+    accent = f"0x{ar:02X}{ag:02X}{ab:02X}"
+
+    h3 = HEIGHT // 3
+    h23 = (HEIGHT * 2) // 3
+
+    result = subprocess.run([
         "ffmpeg", "-y",
         "-f", "lavfi",
-        "-i", f"color=c={base}:size={WIDTH}x{HEIGHT}:rate={FPS}",
+        "-i", f"color=c={color}:size={WIDTH}x{HEIGHT}:rate={FPS}",
         "-t", str(duration + 1),
         "-vf", (
-            # Couche de couleur d'accent en haut
-            f"drawbox=x=0:y=0:w={WIDTH}:h={h_mid}:color={accent}@0.55:t=fill,"
-            # Assombrissement bas (dégradé vers le noir)
-            f"drawbox=x=0:y={h_mid}:w={WIDTH}:h={h_bot}:color=black@0.25:t=fill,"
-            # Vignette cinématique — bords sombres, centre lumineux
-            "vignette=PI/3.5"
+            # Haut : couleur d'accent (plus claire)
+            f"drawbox=x=0:y=0:w={WIDTH}:h={h3}:color={accent}@0.8:t=fill,"
+            # Milieu : légère transition
+            f"drawbox=x=0:y={h3}:w={WIDTH}:h={h3}:color={accent}@0.3:t=fill"
         ),
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-an",
-        "-loglevel", "quiet", output_path
+        "-loglevel", "error", output_path
     ], capture_output=True, timeout=60)
+    if result.returncode != 0:
+        print(f"[BG] ffmpeg error: {result.stderr.decode()[-200:]}")
 
 
 def _get_audio_duration(audio_path: str) -> float:
