@@ -4,8 +4,8 @@ import json
 import re
 
 CHARACTERS = {
-    "ALEX": {"voice": "fr-FR-HenriNeural", "gender": "homme"},
-    "SARAH": {"voice": "fr-FR-DeniseNeural", "gender": "femme"},
+    "ALEX": {"voice": "fr-FR-RemyMultilingualNeural", "gender": "homme"},
+    "SARAH": {"voice": "fr-FR-VivienneMultilingualNeural", "gender": "femme"},
 }
 
 # Nombre de mots cible par personnage (dialogue total)

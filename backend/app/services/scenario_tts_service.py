@@ -8,7 +8,7 @@ async def _generate_line_audio(line: str, voice: str) -> bytes:
     import edge_tts
 
     audio_chunks = []
-    communicate = edge_tts.Communicate(line, voice, rate="-3%")
+    communicate = edge_tts.Communicate(line, voice, rate="+0%")
 
     try:
         async for chunk in communicate.stream():

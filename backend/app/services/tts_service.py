@@ -4,12 +4,13 @@ import os
 import io
 import re
 
+# Voix dernière génération Microsoft Neural — beaucoup plus naturelles
 VOICES = [
-    "fr-FR-DeniseNeural",
-    "fr-FR-HenriNeural",
-    "fr-FR-EloiseNeural",
+    "fr-FR-VivienneMultilingualNeural",  # Féminine — génération 2024, très naturelle
+    "fr-FR-RemyMultilingualNeural",      # Masculine — génération 2024, très naturelle
+    "fr-FR-DeniseNeural",                # Fallback
 ]
-EDGE_TTS_TIMEOUT = 25  # secondes max par voix
+EDGE_TTS_TIMEOUT = 30  # secondes max par voix
 
 
 _UNITS = ["", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf",
@@ -96,7 +97,7 @@ async def _run_edge_tts(text: str, voice: str) -> tuple[bytes, list]:
     audio_chunks = []
     word_boundaries = []
 
-    communicate = edge_tts.Communicate(text, voice, rate="-3%")
+    communicate = edge_tts.Communicate(text, voice, rate="+0%")
 
     # Utilise .stream() pour la compatibilité avec toutes les versions
     async for chunk in communicate.stream():
