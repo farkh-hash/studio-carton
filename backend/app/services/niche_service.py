@@ -97,14 +97,15 @@ Pour chaque niche retourne un objet JSON avec exactement ces champs :
 RÈGLES ABSOLUES pour les hooks :
 - Maximum 10 mots par hook
 - PAS de formule générique comme "Découvrez...", "Apprenez...", "Voici..."
-- Utilise UNE de ces formules validées :
-  * Transformationnel : "Je suis passé de [X] à [Y] en [durée]"
-  * Audacieux négatif : "Arrête de [action commune]. Tu perds [perte chiffrée]."
-  * Contre-intuitif : "[Chose commune] est la pire chose à faire pour [résultat]."
-  * Chiffre précis : "[X]% des gens ignorent ça. Et ça les ruine."
-  * Urgence : "Stop. Ce que tu fais avec [concept] va te coûter [conséquence]."
+- INTERDIT : faux témoignages ("Je suis passé de X à Y"), résultats inventés, promesses de revenus
+- Utilise UNE de ces formules validées basées sur des FAITS VÉRIFIABLES :
+  * Chiffre précis : "[X]% des gens ignorent ça. Et ça change tout."
+  * Contre-intuitif : "[Chose commune] est ce qui empêche [résultat]."
+  * Urgence factuelle : "Ce que [experts/études] disent sur [concept] va te surprendre."
+  * Révélation : "La vraie raison pour laquelle [croyance populaire] est fausse."
+  * Erreur commune : "Arrête de [action courante]. Voici pourquoi."
 - Crée une boucle ouverte : le spectateur DOIT regarder la suite
-- Chiffres précis (73%, 30 jours, 500€) plutôt que vagues
+- Chiffres précis uniquement si vérifiables (statistiques réelles, données connues)
 
 Retourne UNIQUEMENT un tableau JSON valide sans texte autour."""
 
@@ -149,11 +150,12 @@ STRUCTURE :
 RÈGLES :
 - Commence par le hook exact, aucune modification
 - Phrases max 8-10 mots
-- Chiffres précis ("73%" pas "la plupart")
+- Chiffres et faits précis et vérifiables uniquement
 - Uniquement le texte à lire à voix haute
 - Pas d'annotations, tirets ou numéros
 - Langage parlé naturel
-- Chaque phrase crée l'envie d'entendre la suivante (boucle ouverte)"""
+- Chaque phrase crée l'envie d'entendre la suivante (boucle ouverte)
+- INTERDIT : faux témoignages perso, promesses de revenus garantis, résultats inventés"""
 
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",

@@ -193,8 +193,8 @@ def assemble_scenario(
             "ffmpeg", "-y", "-stream_loop", "-1", "-i", bg_video_path,
             "-t", str(total_duration + 0.5),
             "-vf", f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT},"
-                   "colorlevels=rimin=0:rimax=0.65:gimin=0:gimax=0.65:bimin=0:bimax=0.65",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "28", "-an",
+                   "colorlevels=rimin=0:rimax=0.80:gimin=0:gimax=0.80:bimin=0:bimax=0.80",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "20", "-an",
             "-loglevel", "quiet", bg_tmp
         ], capture_output=True, timeout=120)
     else:
@@ -220,8 +220,10 @@ def assemble_scenario(
         "-map", "0:v",
         "-map", "1:a",
         "-t", str(total_duration),
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-        "-c:a", "aac", "-b:a", "128k",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "20",
+        "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
+        "-c:a", "aac", "-b:a", "192k",
+        "-movflags", "+faststart",
         "-loglevel", "warning",
         output_path
     ]

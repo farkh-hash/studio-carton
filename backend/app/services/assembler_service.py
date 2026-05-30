@@ -1,80 +1,97 @@
 import os
-import numpy as np
-from PIL import Image, ImageDraw, ImageFont
-from moviepy.editor import (
-    AudioFileClip,
-    ImageClip,
-    VideoFileClip,
-    CompositeVideoClip,
-    ColorClip,
-)
+import subprocess
+import unicodedata
 from app.services.subtitle_service import SubtitleChunk
 from typing import List
 
 WIDTH, HEIGHT = 1080, 1920
 FPS = 30
-FONT_SIZE = 88
-FONT_COLOR = (255, 230, 0)
-OUTLINE_COLOR = (0, 0, 0)
-BG_COLOR = (10, 10, 20)
+
+FONT_PATHS = [
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/liberation/LiberationSans-Bold.ttf",
+]
 
 
-def _load_font(size: int) -> ImageFont.FreeTypeFont:
-    font_paths = [
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/liberation/LiberationSans-Bold.ttf",
-    ]
-    for path in font_paths:
-        if os.path.exists(path):
-            return ImageFont.truetype(path, size)
-    return ImageFont.load_default()
+def _get_font() -> str:
+    for p in FONT_PATHS:
+        if os.path.exists(p):
+            return p
+    return ""
 
 
-def _make_fallback_bg(duration: float) -> ImageClip:
-    img = Image.new("RGB", (WIDTH, HEIGHT), BG_COLOR)
-    draw = ImageDraw.Draw(img)
-    for y in range(HEIGHT):
-        ratio = y / HEIGHT
-        r = int(BG_COLOR[0] + (30 - BG_COLOR[0]) * ratio)
-        g = int(BG_COLOR[1] + (10 - BG_COLOR[1]) * ratio)
-        b = int(BG_COLOR[2] + (40 - BG_COLOR[2]) * ratio)
-        draw.line([(0, y), (WIDTH, y)], fill=(r, g, b))
-    return ImageClip(np.array(img), duration=duration)
+def _escape_ffmpeg(text: str) -> str:
+    text = unicodedata.normalize("NFC", text)
+    text = text.replace("'", " ").replace("’", " ").replace("‘", " ")
+    text = text.replace('"', " ").replace(":", " ").replace("%", "pct")
+    text = text.replace("[", "").replace("]", "").replace("\\", "").replace("/", " ")
+    return text.strip()
 
 
-def _make_subtitle_frame(text: str) -> np.ndarray:
-    img = Image.new("RGBA", (WIDTH, 320), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    font = _load_font(FONT_SIZE)
-
+def _wrap_text(text: str, max_chars: int = 20) -> list[str]:
     words = text.split()
     lines, line = [], []
     for word in words:
-        test = " ".join(line + [word])
-        bbox = draw.textbbox((0, 0), test, font=font)
-        if bbox[2] > WIDTH - 80:
-            lines.append(" ".join(line))
+        if sum(len(w) for w in line) + len(line) + len(word) > max_chars:
+            if line:
+                lines.append(" ".join(line))
             line = [word]
         else:
             line.append(word)
     if line:
         lines.append(" ".join(line))
+    return lines[:3]
 
-    total_h = len(lines) * (FONT_SIZE + 14)
-    y = (320 - total_h) // 2
 
-    for line_text in lines:
-        bbox = draw.textbbox((0, 0), line_text, font=font)
-        x = (WIDTH - (bbox[2] - bbox[0])) // 2
-        for dx in [-3, -2, 0, 2, 3]:
-            for dy in [-3, -2, 0, 2, 3]:
-                if dx != 0 or dy != 0:
-                    draw.text((x + dx, y + dy), line_text, font=font, fill=(*OUTLINE_COLOR, 255))
-        draw.text((x, y), line_text, font=font, fill=(*FONT_COLOR, 255))
-        y += FONT_SIZE + 14
+def _get_audio_duration(audio_path: str) -> float:
+    r = subprocess.run([
+        "ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", audio_path
+    ], capture_output=True, text=True, timeout=10)
+    try:
+        return float(r.stdout.strip())
+    except Exception:
+        return 60.0
 
-    return np.array(img)
+
+def _build_subtitle_filters(chunks: List[SubtitleChunk], font: str) -> str:
+    if not font or not chunks:
+        return ""
+
+    filters = []
+    FONT_SIZE = 82
+    LINE_H = 96
+
+    for chunk in chunks:
+        t_start = chunk.start
+        t_end = chunk.end
+        # \, = virgule échappée pour le parser de filtres ffmpeg
+        enable = f"'gte(t\\,{t_start:.3f})*lte(t\\,{t_end:.3f})'"
+
+        lines = _wrap_text(chunk.text, max_chars=20)
+        base_y = HEIGHT - 460
+
+        for i, line_text in enumerate(lines):
+            escaped = _escape_ffmpeg(line_text)
+            if not escaped:
+                continue
+            y = base_y + i * LINE_H
+
+            # 8 ombres directionnelles pour lisibilité maximale
+            for dx, dy in [(-4, -4), (-4, 4), (4, -4), (4, 4),
+                           (0, 5), (0, -5), (5, 0), (-5, 0)]:
+                filters.append(
+                    f"drawtext=fontfile='{font}':text='{escaped}':fontsize={FONT_SIZE}:"
+                    f"fontcolor=black@0.95:x=(w-tw)/2+{dx}:y={y+dy}:enable={enable}"
+                )
+            # Texte principal blanc
+            filters.append(
+                f"drawtext=fontfile='{font}':text='{escaped}':fontsize={FONT_SIZE}:"
+                f"fontcolor=white:x=(w-tw)/2:y={y}:enable={enable}"
+            )
+
+    return ",".join(filters)
 
 
 def assemble_video(
@@ -83,51 +100,75 @@ def assemble_video(
     output_path: str,
     bg_video_path: str = None,
 ) -> str:
-    audio = AudioFileClip(audio_path)
-    duration = audio.duration
+    font = _get_font()
+    duration = _get_audio_duration(audio_path)
 
+    # 1. Normaliser l'audio — loudnorm -14 LUFS (standard TikTok/YouTube), 192kbps AAC
+    audio_norm = output_path.replace(".mp4", "_norm.aac")
+    subprocess.run([
+        "ffmpeg", "-y", "-i", audio_path,
+        "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
+        "-c:a", "aac", "-b:a", "192k",
+        "-loglevel", "quiet", audio_norm
+    ], capture_output=True, timeout=60)
+    audio_to_use = audio_norm if os.path.exists(audio_norm) else audio_path
+
+    # 2. Préparer le fond vidéo — CRF 20, luminosité 80% (lisible sans être sombre)
+    bg_tmp = output_path.replace(".mp4", "_bg.mp4")
     if bg_video_path and os.path.exists(bg_video_path):
-        try:
-            bg = VideoFileClip(bg_video_path, audio=False).subclip(0, duration)
-        except Exception:
-            bg = _make_fallback_bg(duration)
+        subprocess.run([
+            "ffmpeg", "-y", "-stream_loop", "-1", "-i", bg_video_path,
+            "-t", str(duration + 0.5),
+            "-vf", (
+                f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,"
+                f"crop={WIDTH}:{HEIGHT},"
+                "colorlevels=rimin=0:rimax=0.80:gimin=0:gimax=0.80:bimin=0:bimax=0.80"
+            ),
+            "-c:v", "libx264", "-preset", "fast", "-crf", "20", "-an",
+            "-loglevel", "quiet", bg_tmp
+        ], capture_output=True, timeout=120)
     else:
-        bg = _make_fallback_bg(duration)
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "lavfi",
+            "-i", f"color=c=0x080814:size={WIDTH}x{HEIGHT}:rate={FPS}",
+            "-t", str(duration + 0.5),
+            "-c:v", "libx264", "-preset", "fast", "-loglevel", "quiet", bg_tmp
+        ], capture_output=True, timeout=30)
 
-    overlay = ColorClip(size=(WIDTH, HEIGHT), color=(0, 0, 0), duration=duration).set_opacity(0.30)
+    # 3. Filtres sous-titres drawtext
+    vf = _build_subtitle_filters(chunks, font)
+    vf = vf if vf else "null"
 
-    subtitle_clips = []
-    for chunk in chunks:
-        frame = _make_subtitle_frame(chunk.text)
-        clip = (
-            ImageClip(frame, ismask=False)
-            .set_start(chunk.start)
-            .set_duration(chunk.end - chunk.start)
-            .set_position(("center", HEIGHT - 420))
-        )
-        subtitle_clips.append(clip)
+    # 4. Assemblage final — CRF 18 = haute qualité, +faststart pour streaming web
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", bg_tmp,
+        "-i", audio_to_use,
+        "-vf", vf,
+        "-map", "0:v",
+        "-map", "1:a",
+        "-t", str(duration),
+        "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+        "-c:a", "aac", "-b:a", "192k",
+        "-movflags", "+faststart",
+        "-loglevel", "warning",
+        output_path
+    ]
+    result = subprocess.run(cmd, capture_output=True, timeout=300)
 
-    video = CompositeVideoClip(
-        [bg, overlay] + subtitle_clips,
-        size=(WIDTH, HEIGHT),
-    ).set_audio(audio)
-
-    video.write_videofile(
-        output_path,
-        fps=FPS,
-        codec="libx264",
-        audio_codec="aac",
-        temp_audiofile=output_path + ".tmp.m4a",
-        remove_temp=True,
-        logger=None,
-    )
-    audio.close()
-    video.close()
-
+    for f in [bg_tmp, audio_norm]:
+        try:
+            if os.path.exists(f):
+                os.remove(f)
+        except Exception:
+            pass
     if bg_video_path and os.path.exists(bg_video_path):
         try:
             os.remove(bg_video_path)
         except Exception:
             pass
+
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg error: {result.stderr.decode()[-300:]}")
 
     return output_path

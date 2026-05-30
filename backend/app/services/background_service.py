@@ -27,7 +27,7 @@ def _process_clip_ffmpeg(input_path: str, output_path: str, width: int = 1080, h
     cmd = [
         "ffmpeg", "-y", "-i", input_path,
         "-vf", f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "28",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "20",
         "-an", output_path
     ]
     result = subprocess.run(cmd, capture_output=True, timeout=60)
@@ -67,8 +67,8 @@ def build_background_video(clip_paths: list[str], duration: float, output_path: 
         "ffmpeg", "-y",
         "-f", "concat", "-safe", "0", "-i", concat_file.name,
         "-t", str(duration),
-        "-c:v", "libx264", "-preset", "fast", "-crf", "26",
-        "-vf", f"scale=1080:1920,fade=t=in:st=0:d=0.8,fade=t=out:st={max(0, duration-1.2)}:d=0.8",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "20",
+        "-vf", f"scale=1080:1920,fade=t=in:st=0:d=0.5,fade=t=out:st={max(0, duration-0.8)}:d=0.5",
         "-an", output_path
     ]
     result = subprocess.run(cmd, capture_output=True, timeout=120)

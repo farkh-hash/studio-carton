@@ -123,10 +123,7 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
         if word_boundaries:
             chunks = subtitle_service.build_subtitles_from_words(word_boundaries, words_per_chunk=3)
         else:
-            from moviepy.editor import AudioFileClip
-            audio_clip = AudioFileClip(audio_path)
-            audio_duration = audio_clip.duration
-            audio_clip.close()
+            audio_duration = assembler_service._get_audio_duration(audio_path)
             chunks = subtitle_service.build_subtitles(script, audio_duration)
 
         video_filename = f"video_{job_id}.mp4"

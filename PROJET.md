@@ -161,8 +161,9 @@ studio-carton/
 ## Prochaines étapes
 
 ### Immédiat
-- [ ] Tester la qualité des vidéos scénario générées
-- [ ] Améliorer la qualité des scripts (moins génériques)
+- [x] Refonte pipeline vidéo (MoviePy → 100% ffmpeg, CRF 18, 192kbps, loudnorm -14 LUFS)
+- [x] Hooks niche sans faux témoignages (contenu honnête et vérifiable)
+- [ ] Tester la qualité des vidéos générées après refonte
 - [ ] Tester Agent Tendances + Monétisation ensemble → générer contenu ciblé
 
 ### Court terme
@@ -178,6 +179,16 @@ studio-carton/
 ---
 
 ## Historique des sessions
+
+### Session 4 — 2026-05-30
+
+**Refonte qualité pipeline vidéo :**
+- assembler_service.py : réécriture complète MoviePy → 100% ffmpeg (CRF 18, 192kbps AAC, loudnorm -14 LUFS, sous-titres drawtext avec ombres 8-directionnelles)
+- scenario_assembler_service.py : CRF 28→20 fond, 128k→192k audio, luminosité 65%→80%, loudnorm+faststart
+- background_service.py : CRF 26/28→20, fade plus rapide (0.8s→0.5s)
+- pipeline_service.py : suppression MoviePy (ffprobe à la place)
+- requirements.txt : suppression moviepy, Pillow, numpy (build Docker plus léger)
+- niche_service.py : hooks sans faux témoignages, contenu factuel et vérifiable uniquement
 
 ### Session 3 — 2026-05-30
 - Agent Monétisation : niche #1 = Immobilier (6500-14400€/mois), #2 = IA (4400-10000€/mois)
