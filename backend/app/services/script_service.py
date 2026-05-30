@@ -218,6 +218,8 @@ async def generate_script(topic: str, duration: int = 60, style: str = "viral", 
 
     client = Groq(api_key=settings.GROQ_API_KEY)
 
+    hook_instruction = f'Utilise ce hook prouvé : "{best_hook}"' if best_hook else "Utilise les patterns prouvés ci-dessus pour créer un hook ultra-fort"
+
     prompt = f"""Crée un script viral COMPLET et FLUIDE de {duration} secondes (~{target_words} mots).
 
 SUJET : {topic}
@@ -226,7 +228,7 @@ STYLE : {style_note}
 {mega_context}
 
 STRUCTURE :
-- HOOK ({hook_sec}s) : {"Utilise ce hook prouvé : \"" + best_hook + "\"" if best_hook else "Utilise les patterns prouvés ci-dessus pour créer un hook ultra-fort"}
+- HOOK ({hook_sec}s) : {hook_instruction}
 - CONTENU ({content_sec}s) : développe en utilisant les faits réels, la douleur du persona, les techniques de rétention prouvées
 - CTA ({cta_sec}s) : utilise le CTA prouvé, question engageante
 
