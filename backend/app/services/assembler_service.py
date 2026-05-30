@@ -46,54 +46,44 @@ def _wrap_text(text: str, max_chars: int = 16) -> list[str]:
     return lines[:2]
 
 
-def _get_niche_color(topic: str) -> str:
-    """Couleur dominante selon la niche — assez sombre pour les sous-titres mais clairement colorée."""
+def _get_niche_color(topic: str) -> tuple[str, str]:
+    """Retourne (couleur_base, couleur_vive) selon la niche."""
     t = topic.lower()
     if any(w in t for w in ["finance", "argent", "invest", "bourse", "riche", "patrimoine", "crypto", "trading"]):
-        return "0x0D2444"   # Bleu marine foncé
+        return "0x0A1628", "0x1E5FA0"   # Bleu foncé / bleu vif
     if any(w in t for w in ["santé", "sante", "sport", "fitness", "maigrir", "nutrition", "regime"]):
-        return "0x0A2A14"   # Vert forêt foncé
+        return "0x081A0A", "0x1A7A30"   # Vert foncé / vert vif
     if any(w in t for w in ["ia", "tech", "intelligence", "robot", "ai", "digital", "code", "app"]):
-        return "0x1A0A3A"   # Violet indigo
+        return "0x10082A", "0x6020C0"   # Violet foncé / violet vif
     if any(w in t for w in ["amour", "relation", "psycho", "mental", "confiance"]):
-        return "0x2A0A14"   # Rouge bordeaux
+        return "0x1A040C", "0xA0184A"   # Rouge foncé / rouge vif
     if any(w in t for w in ["business", "entrepreneur", "startup", "vente", "marketing"]):
-        return "0x1E1205"   # Marron doré foncé
-    return "0x120A2E"       # Violet profond — défaut
+        return "0x160E02", "0xC07010"   # Ambre foncé / or vif
+    return "0x0C0820", "0x5020A0"       # Violet foncé / violet vif — défaut
 
 
 def _create_animated_bg(output_path: str, duration: float, topic: str = "") -> None:
-    """Génère un fond dégradé avec ffmpeg — visible et professionnel."""
-    color = _get_niche_color(topic)
-    # Couleur légèrement plus claire pour le haut (dégradé)
-    r = int(color[2:4], 16)
-    g = int(color[4:6], 16)
-    b = int(color[6:8], 16)
-    # Accent = +40% luminosité sur chaque canal
-    ar = min(255, int(r * 1.8 + 30))
-    ag = min(255, int(g * 1.8 + 25))
-    ab = min(255, int(b * 1.8 + 35))
-    accent = f"0x{ar:02X}{ag:02X}{ab:02X}"
-
+    """Fond animé avec rotation de teinte — donne de la vie sans être lent."""
+    base, vivid = _get_niche_color(topic)
     h3 = HEIGHT // 3
-    h23 = (HEIGHT * 2) // 3
 
     result = subprocess.run([
         "ffmpeg", "-y",
         "-f", "lavfi",
-        "-i", f"color=c={color}:size={WIDTH}x{HEIGHT}:rate={FPS}",
+        "-i", f"color=c={base}:size={WIDTH}x{HEIGHT}:rate={FPS}",
         "-t", str(duration + 1),
         "-vf", (
-            # Haut : couleur d'accent (plus claire)
-            f"drawbox=x=0:y=0:w={WIDTH}:h={h3}:color={accent}@0.8:t=fill,"
-            # Milieu : légère transition
-            f"drawbox=x=0:y={h3}:w={WIDTH}:h={h3}:color={accent}@0.3:t=fill"
+            # Gradient : couleur vive en haut, transition vers le bas
+            f"drawbox=x=0:y=0:w={WIDTH}:h={h3}:color={vivid}@0.85:t=fill,"
+            f"drawbox=x=0:y={h3}:w={WIDTH}:h={h3}:color={vivid}@0.35:t=fill,"
+            # Rotation de teinte lente — crée du mouvement sans slowdown
+            "hue=H='0.4*t':s=1.5"
         ),
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-an",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24", "-an",
         "-loglevel", "error", output_path
     ], capture_output=True, timeout=60)
     if result.returncode != 0:
-        print(f"[BG] ffmpeg error: {result.stderr.decode()[-200:]}")
+        print(f"[BG] error: {result.stderr.decode()[-200:]}")
 
 
 def _get_audio_duration(audio_path: str) -> float:
@@ -159,8 +149,8 @@ def assemble_video(
     audio_norm = output_path.replace(".mp4", "_norm.aac")
     subprocess.run([
         "ffmpeg", "-y", "-i", audio_path,
-        "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
-        "-c:a", "aac", "-b:a", "192k",
+        "-af", "aresample=44100,loudnorm=I=-14:TP=-1.5:LRA=11",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
         "-loglevel", "quiet", audio_norm
     ], capture_output=True, timeout=60)
     audio_to_use = audio_norm if os.path.exists(audio_norm) else audio_path
