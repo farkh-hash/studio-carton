@@ -64,7 +64,7 @@ Tu réponds toujours en JSON valide uniquement."""
 
 
 def analyze_niches() -> list[dict]:
-    client = Groq(api_key=settings.GROQ_API_KEY)
+    from app.services.groq_client import chat as groq_chat
     today = date.today().strftime("%d/%m/%Y")
 
     niche_context = json.dumps(
@@ -109,17 +109,7 @@ RÈGLES ABSOLUES pour les hooks :
 
 Retourne UNIQUEMENT un tableau JSON valide sans texte autour."""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
-        max_tokens=4000,
-        temperature=0.75,
-    )
-
-    raw = response.choices[0].message.content.strip()
+    raw = groq_chat(messages=[{"role": "user", "content": prompt}], system=SYSTEM_PROMPT, max_tokens=4000, temperature=0.75)
     if "```" in raw:
         raw = raw.split("```")[1]
         if raw.startswith("json"):
@@ -130,7 +120,7 @@ Retourne UNIQUEMENT un tableau JSON valide sans texte autour."""
 
 
 def generate_script_from_topic(topic: str, hook: str, niche: str, format_duration: str, style: str = "viral") -> str:
-    client = Groq(api_key=settings.GROQ_API_KEY)
+    from app.services.groq_client import chat as groq_chat
 
     duration_map = {"30s": 30, "60s": 60, "90s": 90, "2min": 120, "3min": 180}
     duration = duration_map.get(format_duration, 60)
@@ -157,10 +147,4 @@ RÈGLES :
 - Chaque phrase crée l'envie d'entendre la suivante (boucle ouverte)
 - INTERDIT : faux témoignages perso, promesses de revenus garantis, résultats inventés"""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=2000,
-        temperature=0.85,
-    )
-    return response.choices[0].message.content.strip()
+    return groq_chat(messages=[{"role": "user", "content": prompt}], max_tokens=2000, temperature=0.85)

@@ -1,5 +1,4 @@
-from groq import Groq
-from app.core.config import settings
+﻿from app.core.config import settings
 import json
 
 
@@ -8,9 +7,7 @@ def build_persona(topic: str, platform: str = "tiktok") -> dict:
     Construit le profil exact du spectateur cible pour ce sujet.
     Plus le profil est précis, plus le script sera ciblé et impactant.
     """
-    client = Groq(api_key=settings.GROQ_API_KEY)
-
-    prompt = f"""Tu es expert en psychologie des audiences sociales (TikTok, YouTube, Instagram).
+        prompt = f"""Tu es expert en psychologie des audiences sociales (TikTok, YouTube, Instagram).
 
 SUJET DE LA VIDÉO : "{topic}"
 PLATEFORME : {platform}
@@ -34,14 +31,9 @@ Retourne un JSON :
 Sois très précis et réaliste. Pas de généralités.
 JSON uniquement."""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=800,
-        temperature=0.6,
-    )
+    raw_content = groq_chat(messages=[{"role": "user", "content": prompt}], max_tokens=800, temperature=0.6)
 
-    raw = response.choices[0].message.content.strip()
+    raw = raw_resp
     if "```" in raw:
         raw = raw.split("```")[1]
         if raw.startswith("json"):

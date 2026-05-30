@@ -161,8 +161,8 @@ async def analyze_monetisation(target_subscribers: int = 50000) -> dict:
     affiliate_tasks = [_search_affiliate_opportunities(n["key"].replace("_", " ")) for n in top_niches]
     affiliate_results = await asyncio.gather(*affiliate_tasks, return_exceptions=True)
 
-    # Analyse Groq pour stratégie concrète
-    client = Groq(api_key=settings.GROQ_API_KEY)
+    # Analyse Groq avec fallback automatique
+    from app.services.groq_client import chat as groq_chat
 
     niche_context = json.dumps([
         {
@@ -209,14 +209,7 @@ Données niches :
 
 Sois précis avec des chiffres réels. JSON uniquement."""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=2500,
-        temperature=0.5,
-    )
-
-    raw = response.choices[0].message.content.strip()
+    raw = groq_chat(messages=[{"role": "user", "content": prompt}], max_tokens=2500, temperature=0.5)
     if "```" in raw:
         raw = raw.split("```")[1]
         if raw.startswith("json"):

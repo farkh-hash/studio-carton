@@ -1,11 +1,9 @@
-from groq import Groq
-from app.core.config import settings
 import json
 
 
 def generate_captions(topic: str, script: str, niche: str = "") -> dict:
     """Génère les captions/titres/hashtags optimisés pour chaque plateforme."""
-    client = Groq(api_key=settings.GROQ_API_KEY)
+    from app.services.groq_client import chat as groq_chat
 
     prompt = f"""Tu es expert en stratégie de publication sur les réseaux sociaux.
 
@@ -41,14 +39,7 @@ Règles :
 - Optimisé pour l'algorithme de chaque plateforme
 - CTA naturel (pas forcé)"""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=1500,
-        temperature=0.7,
-    )
-
-    raw = response.choices[0].message.content.strip()
+    raw = groq_chat(messages=[{"role": "user", "content": prompt}], max_tokens=1500, temperature=0.7)
     if "```" in raw:
         raw = raw.split("```")[1]
         if raw.startswith("json"):

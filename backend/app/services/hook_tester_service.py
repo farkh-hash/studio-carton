@@ -1,5 +1,3 @@
-from groq import Groq
-from app.core.config import settings
 import json
 
 
@@ -8,7 +6,7 @@ def generate_and_score_hooks(topic: str, analysis_context: str = "") -> list[dic
     Génère 5 hooks différents pour le sujet et les évalue.
     Retourne la liste triée par score décroissant.
     """
-    client = Groq(api_key=settings.GROQ_API_KEY)
+    from app.services.groq_client import chat as groq_chat
 
     context_section = f"\nCONTEXTE des scripts viraux analysés :\n{analysis_context}" if analysis_context else ""
 
@@ -41,14 +39,7 @@ RÈGLES pour les hooks :
 Score : 1-10 basé sur le potentiel de rétention estimé.
 JSON uniquement, sans texte autour."""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=1000,
-        temperature=0.9,
-    )
-
-    raw = response.choices[0].message.content.strip()
+    raw = groq_chat(messages=[{"role": "user", "content": prompt}], max_tokens=1000, temperature=0.9)
     if "```" in raw:
         raw = raw.split("```")[1]
         if raw.startswith("json"):

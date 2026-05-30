@@ -1,5 +1,4 @@
-from groq import Groq
-from app.core.config import settings
+﻿from app.core.config import settings
 import json
 
 
@@ -8,9 +7,7 @@ async def research_viral_patterns(topic: str, platform: str = "tiktok") -> dict:
     Analyse les patterns viraux pour ce sujet sur les réseaux sociaux.
     Retourne les insights pour créer un script optimisé.
     """
-    client = Groq(api_key=settings.GROQ_API_KEY)
-
-    research_prompt = f"""Tu es un analyste expert en contenu viral avec accès aux données de performance TikTok, YouTube Shorts et Instagram Reels.
+        research_prompt = f"""Tu es un analyste expert en contenu viral avec accès aux données de performance TikTok, YouTube Shorts et Instagram Reels.
 
 SUJET À ANALYSER : "{topic}"
 PLATEFORME CIBLE : {platform}
@@ -48,14 +45,9 @@ Base-toi sur ce qui FONCTIONNE VRAIMENT sur {platform} pour ce sujet en 2025.
 Sois précis, concret, avec des chiffres réels quand possible.
 Retourne UNIQUEMENT le JSON, sans texte autour."""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": research_prompt}],
-        max_tokens=1500,
-        temperature=0.7,
-    )
+    raw_content = groq_chat(messages=[{"role": "user", "content": research_prompt}], max_tokens=1500, temperature=0.7)
 
-    raw = response.choices[0].message.content.strip()
+    raw = raw_resp
     if "```" in raw:
         raw = raw.split("```")[1]
         if raw.startswith("json"):

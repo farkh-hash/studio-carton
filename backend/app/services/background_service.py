@@ -1,8 +1,7 @@
-import os
+﻿import os
 import httpx
 import tempfile
 import subprocess
-from groq import Groq
 from app.core.config import settings
 
 PEXELS_VIDEO_API = "https://api.pexels.com/videos/search"
@@ -10,14 +9,12 @@ PEXELS_VIDEO_API = "https://api.pexels.com/videos/search"
 
 def _get_english_keywords(topic: str) -> str:
     try:
-        client = Groq(api_key=settings.GROQ_API_KEY)
-        resp = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        from app.services.groq_client import chat as groq_chat
+        return groq_chat(
             messages=[{"role": "user", "content": f"Extract 3 simple English keywords for a Pexels video search about: '{topic}'. Return ONLY the keywords separated by spaces, nothing else."}],
             max_tokens=20,
             temperature=0.3,
         )
-        return resp.choices[0].message.content.strip()
     except Exception:
         return "lifestyle motivation success"
 

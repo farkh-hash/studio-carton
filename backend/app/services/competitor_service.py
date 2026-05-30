@@ -1,7 +1,6 @@
-import httpx
+﻿import httpx
 import asyncio
 import json
-from groq import Groq
 from app.core.config import settings
 
 YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
@@ -91,8 +90,7 @@ async def analyze_competitors(topic: str) -> dict:
         return {}
 
     # Analyse Groq des patterns des concurrents
-    client = Groq(api_key=settings.GROQ_API_KEY)
-    context = json.dumps(competitor_data, ensure_ascii=False, indent=2)
+        context = json.dumps(competitor_data, ensure_ascii=False, indent=2)
 
     prompt = f"""Analyse ces chaînes concurrentes qui cartonnent sur le sujet "{topic}".
 
@@ -116,14 +114,9 @@ Identifie leurs patterns de succès communs et retourne un JSON :
 
 JSON uniquement."""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=700,
-        temperature=0.5,
-    )
+    raw_content = groq_chat(messages=[{"role": "user", "content": prompt}], max_tokens=700, temperature=0.5)
 
-    raw = response.choices[0].message.content.strip()
+    raw = raw_resp
     if "```" in raw:
         raw = raw.split("```")[1]
         if raw.startswith("json"):

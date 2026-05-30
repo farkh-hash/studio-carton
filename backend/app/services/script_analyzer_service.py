@@ -1,5 +1,4 @@
-from groq import Groq
-from app.core.config import settings
+﻿from app.core.config import settings
 import json
 
 
@@ -8,9 +7,7 @@ def analyze_script_deeply(transcript: str, title: str = "") -> dict:
     Analyse profonde d'un vrai script viral.
     Extrait les techniques exactes qui font que ce contenu performe.
     """
-    client = Groq(api_key=settings.GROQ_API_KEY)
-
-    prompt = f"""Tu es un expert en psychologie du contenu viral. Analyse ce script réel d'une vidéo qui cartonne.
+        prompt = f"""Tu es un expert en psychologie du contenu viral. Analyse ce script réel d'une vidéo qui cartonne.
 
 TITRE : {title}
 SCRIPT :
@@ -42,14 +39,9 @@ Analyse EXACTEMENT et PRÉCISÉMENT chaque élément. Retourne un JSON :
 Sois extrêmement précis et basé uniquement sur ce qui est présent dans le script.
 JSON uniquement, sans texte autour."""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=1200,
-        temperature=0.3,
-    )
+    raw_content = groq_chat(messages=[{"role": "user", "content": prompt}], max_tokens=1200, temperature=0.3)
 
-    raw = response.choices[0].message.content.strip()
+    raw = raw_resp
     if "```" in raw:
         raw = raw.split("```")[1]
         if raw.startswith("json"):
@@ -69,9 +61,7 @@ def synthesize_analyses(analyses: list[dict]) -> dict:
     if not analyses:
         return {}
 
-    client = Groq(api_key=settings.GROQ_API_KEY)
-
-    analyses_text = json.dumps(analyses, ensure_ascii=False, indent=2)
+        analyses_text = json.dumps(analyses, ensure_ascii=False, indent=2)
 
     prompt = f"""Tu as analysé {len(analyses)} scripts viraux réels. Voici les analyses individuelles :
 
@@ -94,14 +84,9 @@ Retourne un JSON :
 
 JSON uniquement."""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=800,
-        temperature=0.3,
-    )
+    raw_content = groq_chat(messages=[{"role": "user", "content": prompt}], max_tokens=800, temperature=0.3)
 
-    raw = response.choices[0].message.content.strip()
+    raw = raw_resp
     if "```" in raw:
         raw = raw.split("```")[1]
         if raw.startswith("json"):
