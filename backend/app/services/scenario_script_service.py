@@ -20,7 +20,7 @@ SCENARIO_TYPES = {
 }
 
 
-def generate_scenario(topic: str, duration: int = 60, scenario_type: str = "revelation") -> dict:
+def generate_scenario(topic: str, duration: int = 60, scenario_type: str = "revelation", _depth: int = 0) -> dict:
     """
     Génère un script de scénario complet avec plusieurs personnages.
     RÈGLE ABSOLUE : le dialogue doit faire au minimum {target_words} mots.
@@ -94,10 +94,10 @@ JSON uniquement, sans texte autour."""
         for d in scene.get("dialogues", [])
     )
 
-    # Si trop court, régénérer avec instruction plus forte
-    if total_words < target_words * 0.7:
-        print(f"[SCENARIO] Script trop court ({total_words} mots < {target_words}), régénération forcée...")
-        return generate_scenario(topic, duration, scenario_type)
+    # Si trop court, régénérer une seule fois max (évite récursion infinie)
+    if total_words < target_words * 0.7 and _depth < 1:
+        print(f"[SCENARIO] Script trop court ({total_words} mots < {target_words}), régénération unique...")
+        return generate_scenario(topic, duration, scenario_type, _depth=_depth + 1)
 
     # Ajouter les voix
     for scene in scenario.get("scenes", []):

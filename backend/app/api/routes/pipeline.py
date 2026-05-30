@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import aiosqlite
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -86,7 +86,7 @@ async def get_captions(job_id: int, db: aiosqlite.Connection = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Job not found")
     from app.services import caption_service
     import asyncio
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     captions = await loop.run_in_executor(
         None, caption_service.generate_captions, row["topic"], row["script"] or "", ""
     )

@@ -1,4 +1,4 @@
-import httpx
+﻿import httpx
 import json
 import re
 import asyncio
@@ -45,7 +45,7 @@ async def _get_youtube_transcript(video_id: str) -> str:
     """Récupère le vrai transcript d'une vidéo YouTube."""
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         transcript_list = await loop.run_in_executor(
             None,
             lambda: YouTubeTranscriptApi.get_transcript(video_id, languages=["fr", "fr-FR", "en"])
@@ -188,12 +188,16 @@ Extrais exactement ce qui fait qu'ils cartonnent. Retourne un JSON :
 IMPORTANT : base-toi UNIQUEMENT sur les vrais scripts et titres analysés, pas sur tes connaissances générales.
 JSON uniquement, sans texte autour."""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": analysis_prompt}],
-        max_tokens=1200,
-        temperature=0.4,
-    )
+    def _call_groq_analysis():
+        return client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": analysis_prompt}],
+            max_tokens=1200,
+            temperature=0.4,
+        )
+
+    loop = asyncio.get_running_loop()
+    response = await loop.run_in_executor(None, _call_groq_analysis)
 
     raw = response.choices[0].message.content.strip()
     if "```" in raw:

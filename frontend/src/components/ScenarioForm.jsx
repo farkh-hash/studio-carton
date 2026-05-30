@@ -30,8 +30,8 @@ export default function ScenarioForm({ onJobCreated }) {
       });
       setPreview(res.data);
       setStep("preview");
-    } catch {
-      setError("Erreur lors de la génération du scénario.");
+    } catch (err) {
+      setError(err.response?.data?.detail || "Erreur lors de la génération du scénario.");
     } finally {
       setPreviewLoading(false);
     }

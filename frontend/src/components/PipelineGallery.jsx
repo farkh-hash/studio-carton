@@ -117,12 +117,21 @@ function CaptionModal({ jobId, topic, onClose }) {
 
 function JobCard({ job, onUpdate, onDelete }) {
   const intervalRef = useRef(null);
+  const retriesRef = useRef(0);
   const [showCaptions, setShowCaptions] = useState(false);
 
   useEffect(() => {
     if (["completed", "failed"].includes(job.status)) return;
     if (!job.id) return;
+    retriesRef.current = 0;
     intervalRef.current = setInterval(async () => {
+      retriesRef.current++;
+      // Abandon après 6 minutes (72 × 5s) — évite le polling infini
+      if (retriesRef.current > 72) {
+        clearInterval(intervalRef.current);
+        onUpdate({ ...job, status: "failed", error_msg: "Timeout : job abandonné après 6 minutes." });
+        return;
+      }
       try {
         const res = await getPipelineStatus(job.id);
         onUpdate(res.data);

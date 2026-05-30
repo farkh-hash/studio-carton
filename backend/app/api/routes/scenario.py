@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import os
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -30,7 +30,7 @@ async def generate_scenario(req: ScenarioRequest, db: aiosqlite.Connection = Dep
 @router.post("/preview")
 async def preview_scenario(req: ScenarioRequest):
     from app.services.scenario_script_service import generate_scenario as gen, scenario_to_plain_script
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     scenario = await loop.run_in_executor(None, gen, req.topic, req.duration, req.scenario_type)
     return {"scenario": scenario, "script_preview": scenario_to_plain_script(scenario)}
 
@@ -58,7 +58,7 @@ async def _run_scenario_pipeline(job_id: int, topic: str, duration: int, scenari
 
     try:
         await _update(status="generating_script")
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         scenario = await loop.run_in_executor(None, gen, topic, duration, scenario_type)
         plain_script = scenario_to_plain_script(scenario)
         await _update(status="generating_audio", script=plain_script)

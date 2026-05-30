@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import os
 import re
 import unicodedata
@@ -95,7 +95,7 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
         if not script_override:
             try:
                 from app.services.script_validator_service import validate_script
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 validation = await loop.run_in_executor(None, validate_script, script, topic, duration)
                 score = validation.get("scores", {}).get("overall", 5)
                 print(f"[PIPELINE] Validation: {score}/10 | {len(script.split())} mots")
@@ -129,7 +129,7 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
         video_filename = f"video_{job_id}.mp4"
         video_path = os.path.join(outputs_dir, video_filename)
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
             assembler_service.assemble_video,

@@ -2,7 +2,7 @@ import axios from "axios";
 
 const base = import.meta.env.PROD ? "/api" : "http://localhost:8000/api";
 
-const api = axios.create({ baseURL: base, timeout: 30000 });
+const api = axios.create({ baseURL: base, timeout: 90000 });
 
 // ── Kling AI ──────────────────────────────────────────────────────────────────
 export const generateVideo = (payload) => api.post("/videos/generate", payload);

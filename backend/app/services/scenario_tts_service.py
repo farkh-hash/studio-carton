@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import tempfile
 import os
 
@@ -8,7 +8,7 @@ async def _generate_line_audio(line: str, voice: str) -> bytes:
     import edge_tts
 
     audio_chunks = []
-    communicate = edge_tts.Communicate(line, voice, rate="+5%")
+    communicate = edge_tts.Communicate(line, voice, rate="-3%")
 
     try:
         async for chunk in communicate.stream():
@@ -83,7 +83,7 @@ async def generate_scenario_audio(scenario: dict) -> list[dict]:
         except Exception as e:
             print(f"[SCENARIO TTS] edge-tts failed pour {character}: {e}, fallback gTTS")
             try:
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 audio = await loop.run_in_executor(None, lambda l=line: _gtts_sync(l))
             except Exception:
                 continue

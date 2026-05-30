@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 from groq import Groq
 from app.core.config import settings
 
@@ -56,7 +56,7 @@ async def _run_all_research(topic: str, style: str) -> dict:
 
     async def safe_persona():
         return await asyncio.wait_for(
-            asyncio.get_event_loop().run_in_executor(None, build_persona, topic, "tiktok"),
+            asyncio.get_running_loop().run_in_executor(None, build_persona, topic, "tiktok"),
             timeout=15
         )
 
@@ -81,7 +81,7 @@ async def _run_all_research(topic: str, style: str) -> dict:
     transcripts = research.get("transcripts", []) if isinstance(research, dict) else []
     for t in transcripts[:3]:
         try:
-            analysis = await asyncio.get_event_loop().run_in_executor(
+            analysis = await asyncio.get_running_loop().run_in_executor(
                 None, analyze_script_deeply, t.get("text", ""), t.get("title", "")
             )
             if analysis:
@@ -92,7 +92,7 @@ async def _run_all_research(topic: str, style: str) -> dict:
     synthesis = {}
     if deep_analyses:
         try:
-            synthesis = await asyncio.get_event_loop().run_in_executor(
+            synthesis = await asyncio.get_running_loop().run_in_executor(
                 None, synthesize_analyses, deep_analyses
             )
         except Exception:
@@ -102,7 +102,7 @@ async def _run_all_research(topic: str, style: str) -> dict:
     analysis_context = synthesis.get("key_insight", "") if synthesis else ""
     hooks = []
     try:
-        hooks = await asyncio.get_event_loop().run_in_executor(
+        hooks = await asyncio.get_running_loop().run_in_executor(
             None, generate_and_score_hooks, topic, analysis_context
         )
     except Exception:
@@ -264,7 +264,7 @@ Script :"""
             temperature=0.78,
         )
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     response = await asyncio.wait_for(
         loop.run_in_executor(None, _call_groq),
         timeout=45

@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+﻿from fastapi import APIRouter
 from pydantic import BaseModel
 from app.services import niche_service
 import asyncio
@@ -16,14 +16,14 @@ class ScriptFromTopicRequest(BaseModel):
 
 @router.get("/analyze")
 async def analyze():
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     data = await loop.run_in_executor(None, niche_service.analyze_niches)
     return data
 
 
 @router.post("/script")
 async def generate_script(req: ScriptFromTopicRequest):
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     script = await loop.run_in_executor(
         None,
         niche_service.generate_script_from_topic,

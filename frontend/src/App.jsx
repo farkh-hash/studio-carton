@@ -155,11 +155,11 @@ export default function App() {
             <section className="gallery-section">
               <div className="gallery-header">
                 <h2>Mes vidéos virales</h2>
-                <span className="count">{jobs.length}</span>
+                <span className="count">{jobs.filter(j => j.style !== "scenario").length}</span>
               </div>
               {jobsLoading ? <p className="loading">Chargement...</p> : (
                 <PipelineGallery
-                  jobs={jobs}
+                  jobs={jobs.filter(j => j.style !== "scenario")}
                   onUpdate={(u) => setJobs((prev) => prev.map((j) => j.id === u.id ? { ...j, ...u } : j))}
                   onDelete={(id) => setJobs((prev) => prev.filter((j) => j.id !== id))}
                 />

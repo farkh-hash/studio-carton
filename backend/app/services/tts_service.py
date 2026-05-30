@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import tempfile
 import os
 import io
@@ -77,6 +77,6 @@ async def generate_audio(text: str) -> tuple[bytes, list]:
         return await _edge_tts(text)
     except Exception as e:
         print(f"[TTS] edge-tts indisponible ({e}), fallback gTTS")
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         audio = await loop.run_in_executor(None, _gtts_fallback, text)
         return audio, []
