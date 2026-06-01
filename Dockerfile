@@ -1,10 +1,8 @@
 # ── Stage 1 : build React ──────────────────────────────────────────────────────
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
-COPY frontend/package*.json ./
-RUN npm ci
 COPY frontend/ ./
-RUN npm run build
+RUN npm ci && npm run build
 
 # ── Stage 2 : FastAPI + fichiers statiques ────────────────────────────────────
 FROM python:3.11-slim
