@@ -1,0 +1,15 @@
+INFO:     127.0.0.1:62335 - "POST /api/pipeline/generate?email=moad.farkh2015%40gmail.com HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62344 - "GET /api/pipeline/8/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62348 - "GET /api/pipeline/8/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62352 - "GET /api/pipeline/8/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62357 - "GET /api/pipeline/8/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62365 - "GET /api/pipeline/8/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62376 - "GET /api/pipeline/8/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62381 - "GET /api/pipeline/8/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52619 - "GET /api/pipeline/8/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52623 - "GET /api/pipeline/8/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52627 - "GET /api/pipeline/8/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52631 - "GET /api/pipeline/8/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52641 - "GET /api/pipeline/8/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52651 - "GET /api/pipeline/8/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52655 - "GET /api/pipeline/8/status HTTP/1.1" 200 OK

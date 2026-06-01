@@ -33,9 +33,11 @@ CREATE TABLE IF NOT EXISTS pipeline_jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     topic TEXT NOT NULL,
     style TEXT DEFAULT 'viral',
+    visual_style TEXT DEFAULT 'cinematic',
     duration INTEGER DEFAULT 60,
     status TEXT DEFAULT 'pending',
     script TEXT,
+    storyboard TEXT,
     video_url TEXT,
     error_msg TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -61,6 +63,16 @@ async def init_db():
         await db.execute(CREATE_PIPELINE_TABLE)
         await db.execute(CREATE_USERS_TABLE)
         await db.commit()
+        # Migrations additives — safe sur DB existante
+        for migration in [
+            "ALTER TABLE pipeline_jobs ADD COLUMN visual_style TEXT DEFAULT 'cinematic'",
+            "ALTER TABLE pipeline_jobs ADD COLUMN storyboard TEXT",
+        ]:
+            try:
+                await db.execute(migration)
+                await db.commit()
+            except Exception:
+                pass
 
 
 async def get_db():

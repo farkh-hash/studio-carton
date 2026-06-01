@@ -115,10 +115,83 @@ function CaptionModal({ jobId, topic, onClose }) {
   );
 }
 
+const PHASE_COLORS = {
+  HOOK: "#f59e0b",
+  PROBLÈME: "#ef4444",
+  ESCALADE: "#f97316",
+  TWIST: "#8b5cf6",
+  PAYOFF: "#22c55e",
+};
+
+function PromptsModal({ job, onClose }) {
+  const [copied, setCopied] = useState("");
+  const storyboard = job.storyboard ? JSON.parse(job.storyboard) : null;
+
+  const copy = (text, key) => {
+    navigator.clipboard.writeText(text);
+    setCopied(key);
+    setTimeout(() => setCopied(""), 2000);
+  };
+
+  if (!storyboard) return null;
+
+  const scores = storyboard.scores || {};
+
+  return (
+    <div className="script-modal-overlay" onClick={onClose}>
+      <div className="script-modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+        <div className="script-modal-header">
+          <div>
+            <h3>🎬 Prompts IA — {storyboard.style}</h3>
+            <p className="script-modal-topic">{job.topic}</p>
+          </div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        {scores.total && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "8px 0 12px", borderBottom: "1px solid #333", marginBottom: 12 }}>
+            {["hook", "emotion", "retention", "visual", "shareability"].map(k => (
+              <span key={k} style={{ background: "#1a1a2e", borderRadius: 6, padding: "2px 8px", fontSize: 12, color: "#aaa" }}>
+                {k} <strong style={{ color: "#fff" }}>{scores[k]}/10</strong>
+              </span>
+            ))}
+            <span style={{ background: scores.total >= 45 ? "#064e3b" : "#7f1d1d", borderRadius: 6, padding: "2px 10px", fontSize: 13, fontWeight: 700, color: "#fff", marginLeft: "auto" }}>
+              TOTAL {scores.total}/50
+            </span>
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 420, overflowY: "auto" }}>
+          {storyboard.scenes?.map((scene, i) => (
+            <div key={i} style={{ background: "#111", borderRadius: 8, padding: "10px 12px", border: `1px solid ${PHASE_COLORS[scene.phase] || "#333"}33` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ background: PHASE_COLORS[scene.phase] || "#444", color: "#000", borderRadius: 4, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
+                  {scene.phase}
+                </span>
+                <span style={{ color: "#888", fontSize: 12 }}>Scène {scene.scene} · {scene.duration}s · {scene.camera} · {scene.emotion}</span>
+                <button
+                  className="btn-copy"
+                  style={{ marginLeft: "auto", fontSize: 11, padding: "2px 8px" }}
+                  onClick={() => copy(scene.video_prompt, `scene_${i}`)}
+                >
+                  {copied === `scene_${i}` ? "✅" : "📋"}
+                </button>
+              </div>
+              <p style={{ color: "#ccc", fontSize: 12, margin: 0, lineHeight: 1.5 }}>{scene.action}</p>
+              <p style={{ color: "#666", fontSize: 11, margin: "6px 0 0", fontStyle: "italic" }}>{scene.video_prompt}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function JobCard({ job, onUpdate, onDelete }) {
   const intervalRef = useRef(null);
   const retriesRef = useRef(0);
   const [showCaptions, setShowCaptions] = useState(false);
+  const [showPrompts, setShowPrompts] = useState(false);
 
   useEffect(() => {
     if (["completed", "failed"].includes(job.status)) return;
@@ -148,6 +221,7 @@ function JobCard({ job, onUpdate, onDelete }) {
   return (
     <div className="video-card">
       {showCaptions && <CaptionModal jobId={job.id} topic={job.topic} onClose={() => setShowCaptions(false)} />}
+      {showPrompts && <PromptsModal job={job} onClose={() => setShowPrompts(false)} />}
 
       <div className="card-header">
         <span className="card-status" style={{ color: STATUS_COLORS[job.status] }}>
@@ -167,6 +241,9 @@ function JobCard({ job, onUpdate, onDelete }) {
         <div className="card-actions">
           <a href={videoSrc} download className="btn-download">⬇️ Télécharger</a>
           <button className="btn-captions" onClick={() => setShowCaptions(true)}>📋 Prêt à poster</button>
+          {job.storyboard && (
+            <button className="btn-captions" style={{ background: "#1a1a2e" }} onClick={() => setShowPrompts(true)}>🎬 Prompts IA</button>
+          )}
         </div>
       )}
 

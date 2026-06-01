@@ -9,6 +9,19 @@ const STYLES = [
   { value: "humour", label: "😄 Humour" },
 ];
 
+const VISUAL_STYLES = [
+  { value: "cinematic", label: "🎬 Cinématique" },
+  { value: "cartoon", label: "🎨 Cartoon 2D" },
+  { value: "anime", label: "⚡ Anime" },
+  { value: "pixar", label: "✨ Pixar 3D" },
+  { value: "disney", label: "🏰 Disney" },
+  { value: "scifi", label: "🚀 Sci-Fi" },
+  { value: "documentary", label: "📹 Documentaire" },
+  { value: "humour", label: "😂 Humour visuel" },
+  { value: "motivation", label: "💪 Motivation" },
+  { value: "business", label: "💼 Business" },
+];
+
 const HOOKS = [
   { value: "auto", label: "🤖 Auto (IA choisit)" },
   { value: "curiosite", label: "🔍 Curiosité" },
@@ -21,6 +34,7 @@ const HOOKS = [
 export default function PipelineForm({ onJobCreated, initialTopic = "", initialScript = "", initialFormat = "", onTopicUsed, userEmail, isPro, credits, onUpgrade, onCreditsUpdate }) {
   const [topic, setTopic] = useState("");
   const [style, setStyle] = useState("viral");
+  const [visualStyle, setVisualStyle] = useState("cinematic");
   const [hookType, setHookType] = useState("auto");
   const [duration, setDuration] = useState(60);
   const [loading, setLoading] = useState(false);
@@ -62,7 +76,7 @@ export default function PipelineForm({ onJobCreated, initialTopic = "", initialS
     setLoading(true);
     setError("");
     try {
-      const res = await generatePipeline({ topic, style, duration, script_override: script }, userEmail);
+      const res = await generatePipeline({ topic, style, visual_style: visualStyle, duration, script_override: script }, userEmail);
       onJobCreated(res.data);
       onCreditsUpdate?.(credits - 1);
       setStep("form");
@@ -85,7 +99,8 @@ export default function PipelineForm({ onJobCreated, initialTopic = "", initialS
         <div className="script-meta">
           <span>📌 {topic}</span>
           <span>⏱️ {duration}s</span>
-          <span>🎨 {style}</span>
+          <span>🎭 {style}</span>
+          <span>🎨 {VISUAL_STYLES.find(v => v.value === visualStyle)?.label || visualStyle}</span>
         </div>
         <textarea
           className="script-editor"
@@ -126,9 +141,15 @@ export default function PipelineForm({ onJobCreated, initialTopic = "", initialS
 
       <div className="form-row">
         <div className="form-group">
-          <label>Style</label>
+          <label>Style narratif</label>
           <select value={style} onChange={(e) => setStyle(e.target.value)} disabled={previewLoading}>
             {STYLES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Style visuel</label>
+          <select value={visualStyle} onChange={(e) => setVisualStyle(e.target.value)} disabled={previewLoading}>
+            {VISUAL_STYLES.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
           </select>
         </div>
         <div className="form-group">
@@ -137,6 +158,9 @@ export default function PipelineForm({ onJobCreated, initialTopic = "", initialS
             {HOOKS.map((h) => <option key={h.value} value={h.value}>{h.label}</option>)}
           </select>
         </div>
+      </div>
+
+      <div className="form-row">
         <div className="form-group">
           <label>Durée</label>
           <select value={duration} onChange={(e) => setDuration(Number(e.target.value))} disabled={previewLoading}>

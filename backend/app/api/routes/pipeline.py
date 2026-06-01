@@ -43,13 +43,16 @@ async def generate(req: PipelineRequest, email: Optional[str] = None, db: aiosql
                 await db.commit()
 
     cursor = await db.execute(
-        "INSERT INTO pipeline_jobs (topic, style, duration, status) VALUES (?, ?, ?, 'pending')",
-        (req.topic, req.style, req.duration),
+        "INSERT INTO pipeline_jobs (topic, style, visual_style, duration, status) VALUES (?, ?, ?, ?, 'pending')",
+        (req.topic, req.style, req.visual_style, req.duration),
     )
     await db.commit()
     job_id = cursor.lastrowid
 
-    asyncio.create_task(pipeline_service.run_pipeline(job_id, req.topic, req.style, req.duration, req.script_override, req.hook_type))
+    asyncio.create_task(pipeline_service.run_pipeline(
+        job_id, req.topic, req.style, req.duration,
+        req.script_override, req.hook_type, req.visual_style
+    ))
 
     row = await (await db.execute("SELECT * FROM pipeline_jobs WHERE id=?", (job_id,))).fetchone()
     return dict(row)
@@ -73,7 +76,9 @@ async def get_job(job_id: int, db: aiosqlite.Connection = Depends(get_db)):
 
 @router.get("/{job_id}/status")
 async def get_status(job_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    row = await (await db.execute("SELECT id, status, video_url, error_msg FROM pipeline_jobs WHERE id=?", (job_id,))).fetchone()
+    row = await (await db.execute(
+        "SELECT id, status, video_url, error_msg, storyboard FROM pipeline_jobs WHERE id=?", (job_id,)
+    )).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Job not found")
     return dict(row)

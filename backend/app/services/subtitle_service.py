@@ -10,22 +10,27 @@ class SubtitleChunk:
     end: float
 
 
-def build_subtitles_from_words(words: list, words_per_chunk: int = 3) -> List[SubtitleChunk]:
-    """Sous-titres synchronisés mot à mot via les timestamps edge-tts."""
+def build_subtitles_from_words(words: list, words_per_chunk: int = 1) -> List[SubtitleChunk]:
+    """Sous-titres synchronisés mot à mot via les timestamps edge-tts.
+    words_per_chunk=1 : style viral TikTok mot par mot.
+    Durée minimum 0.2s par chunk pour garantir la lisibilité."""
     if not words:
         return []
+
+    MIN_DURATION = 0.2
 
     chunks = []
     for i in range(0, len(words), words_per_chunk):
         group = words[i:i + words_per_chunk]
         text = " ".join(w["word"] for w in group)
         start = group[0]["start"]
-        end = group[-1]["end"]
-        # Petite marge pour que le sous-titre reste visible 0.05s de plus
+        raw_end = group[-1]["end"] + 0.05
+        # Garantir durée minimum lisible
+        end = max(raw_end, start + MIN_DURATION)
         chunks.append(SubtitleChunk(
             text=text,
             start=round(start, 3),
-            end=round(end + 0.05, 3),
+            end=round(end, 3),
         ))
 
     return chunks

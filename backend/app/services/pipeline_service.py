@@ -1,4 +1,5 @@
 ﻿import asyncio
+import json
 import os
 import re
 import unicodedata
@@ -67,10 +68,18 @@ async def _build_background(job_id: int, topic: str, duration: int) -> str | Non
         return None
 
 
-async def run_pipeline(job_id: int, topic: str, style: str, duration: int, script_override: str = None, hook_type: str = "auto"):
+async def run_pipeline(
+    job_id: int,
+    topic: str,
+    style: str,
+    duration: int,
+    script_override: str = None,
+    hook_type: str = "auto",
+    visual_style: str = "cinematic",
+):
     import aiosqlite
     import aiofiles
-    from app.services import script_service, tts_service, subtitle_service, assembler_service
+    from app.services import tts_service, subtitle_service, assembler_service
 
     _, outputs_dir = _get_paths()
     os.makedirs(outputs_dir, exist_ok=True)
@@ -78,40 +87,39 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
     try:
         await _update_job(job_id, status="generating_script")
 
+        storyboard = None
+
         if script_override:
+            # Mode manuel : script fourni, pas de storyboard
             script = _clean_script(script_override)
         else:
-            script = await script_service.generate_script(topic, duration, style, hook_type)
-            script = _clean_script(script)
+            # Mode automatique : storyboard complet
+            from app.services import storyboard_service
+            storyboard = await storyboard_service.generate_storyboard(topic, duration, style, visual_style)
+            script = _clean_script(storyboard["narration"])
+            storyboard_json = json.dumps(storyboard, ensure_ascii=False)
+            print(f"[PIPELINE] Storyboard: {len(storyboard['scenes'])} scènes, score {storyboard.get('scores', {}).get('total', 0)}/50")
+            await _update_job(job_id, status="generating_audio", script=script, storyboard=storyboard_json)
 
-            word_count = len(script.split())
-            min_words = max(80, int(duration * 1.8))
-            if word_count < min_words:
-                print(f"[PIPELINE] Script trop court ({word_count} mots < {min_words}), regeneration...")
-                script = await script_service.generate_script(topic, duration, style, hook_type)
-                script = _clean_script(script)
+        if storyboard is None:
+            await _update_job(job_id, status="generating_audio", script=script)
 
-        # Agent 4 — Validation
-        if not script_override:
-            try:
-                from app.services.script_validator_service import validate_script
-                loop = asyncio.get_running_loop()
-                validation = await loop.run_in_executor(None, validate_script, script, topic, duration)
-                score = validation.get("scores", {}).get("overall", 5)
-                print(f"[PIPELINE] Validation: {score}/10 | {len(script.split())} mots")
-                if validation.get("regenerate") or score < 6:
-                    print(f"[PIPELINE] Score insuffisant, régénération...")
-                    script = await script_service.generate_script(topic, duration, style, hook_type)
-                    script = _clean_script(script)
-            except Exception as e:
-                print(f"[PIPELINE] Validation error: {e}")
+        # Audio + clips scènes en parallèle
+        audio_task = asyncio.create_task(tts_service.generate_audio(script))
 
-        print(f"[PIPELINE] Script final: {len(script.split())} mots")
-        await _update_job(job_id, status="generating_audio", script=script)
-
-        # Fond animé généré par ffmpeg (plus professionnel que Pexels)
-        audio_bytes, word_boundaries = await tts_service.generate_audio(script)
-        bg_video_path = None
+        if storyboard:
+            from app.services.background_service import fetch_clips_for_scenes
+            from app.core.config import settings
+            if settings.PEXELS_API_KEY:
+                clips_task = asyncio.create_task(fetch_clips_for_scenes(storyboard["scenes"]))
+                (audio_bytes, word_boundaries), clip_paths = await asyncio.gather(audio_task, clips_task)
+            else:
+                audio_bytes, word_boundaries = await audio_task
+                clip_paths = [None] * len(storyboard["scenes"])
+        else:
+            bg_task = asyncio.create_task(_build_background(job_id, topic, duration))
+            (audio_bytes, word_boundaries), bg_video_path = await asyncio.gather(audio_task, bg_task)
+            clip_paths = None
 
         audio_path = os.path.join(outputs_dir, f"audio_{job_id}.mp3")
         async with aiofiles.open(audio_path, "wb") as f:
@@ -119,22 +127,31 @@ async def run_pipeline(job_id: int, topic: str, style: str, duration: int, scrip
 
         await _update_job(job_id, status="assembling_video")
 
+        # Sous-titres mot par mot (1 mot = 1 chunk — style viral TikTok)
         if word_boundaries:
-            chunks = subtitle_service.build_subtitles_from_words(word_boundaries, words_per_chunk=5)
+            chunks = subtitle_service.build_subtitles_from_words(word_boundaries, words_per_chunk=1)
         else:
             audio_duration = assembler_service._get_audio_duration(audio_path)
-            chunks = subtitle_service.build_subtitles(script, audio_duration, words_per_chunk=5)
+            chunks = subtitle_service.build_subtitles(script, audio_duration, words_per_chunk=1)
 
         video_filename = f"video_{job_id}.mp4"
         video_path = os.path.join(outputs_dir, video_filename)
-
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: assembler_service.assemble_video(
-                audio_path, chunks, video_path, bg_video_path, topic
-            ),
-        )
+
+        if storyboard and clip_paths is not None:
+            await loop.run_in_executor(
+                None,
+                lambda: assembler_service.assemble_storyboard_video(
+                    storyboard["scenes"], clip_paths, audio_path, chunks, video_path
+                ),
+            )
+        else:
+            await loop.run_in_executor(
+                None,
+                lambda: assembler_service.assemble_video(
+                    audio_path, chunks, video_path, bg_video_path if clip_paths is None else None, topic
+                ),
+            )
 
         await _update_job(job_id, status="completed", video_url=f"/pipeline/{video_filename}")
 

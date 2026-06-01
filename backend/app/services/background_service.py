@@ -1,4 +1,5 @@
 ﻿import os
+import asyncio
 import httpx
 import tempfile
 import subprocess
@@ -132,6 +133,45 @@ async def fetch_character_clips(character: str, topic_keywords: str) -> str | No
             except Exception:
                 continue
     return None
+
+
+async def fetch_clips_for_scenes(scenes: list) -> list:
+    """Fetche un clip Pexels par scène. Retourne une liste (None si échec)."""
+    from app.core.config import settings
+    if not settings.PEXELS_API_KEY:
+        return [None] * len(scenes)
+
+    headers = {"Authorization": settings.PEXELS_API_KEY}
+
+    async def _fetch_one(scene: dict, idx: int):
+        query = scene.get("pexels_query", "lifestyle motivation success")
+        params = {"query": query, "per_page": 3, "size": "small", "orientation": "portrait"}
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(PEXELS_VIDEO_API, headers=headers, params=params)
+                resp.raise_for_status()
+                videos = resp.json().get("videos", [])
+                if not videos:
+                    return None
+                files = videos[0].get("video_files", [])
+                sd = [f for f in files if f.get("width", 9999) <= 1280] or files
+                if not sd:
+                    return None
+                url = min(sd, key=lambda f: f.get("width", 9999)).get("link", "")
+                if not url:
+                    return None
+                async with httpx.AsyncClient(timeout=30, follow_redirects=True) as dl:
+                    r = await dl.get(url)
+                    r.raise_for_status()
+                    tmp = tempfile.NamedTemporaryFile(suffix=f"_scene{idx}.mp4", delete=False)
+                    tmp.write(r.content)
+                    tmp.close()
+                    return tmp.name
+        except Exception as e:
+            print(f"[BG] Scène {idx} clip failed: {e}")
+            return None
+
+    return list(await asyncio.gather(*[_fetch_one(s, i) for i, s in enumerate(scenes)]))
 
 
 async def fetch_background_clips(topic: str, duration: int) -> list[str]:
